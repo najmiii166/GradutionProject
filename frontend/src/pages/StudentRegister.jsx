@@ -18,6 +18,10 @@ const majors = [
   "Arts",
 ].map((m) => ({ value: m, label: m }));
 
+// same strong rules express-validator uses by default
+const strongPasswordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
 export default function StudentRegister() {
   const [form, setForm] = useState({
     fullName: "",
@@ -36,17 +40,23 @@ export default function StudentRegister() {
   const submit = async (e) => {
     e.preventDefault();
 
-    // Guard: ID card is required by the backend
+    // Client-side checks that match backend expectations
     if (!idFile) {
       setToast("Please attach your Student ID card image.");
       return;
     }
-    // Guard: simple client-side check for required fields
-    const missing = ["fullName", "email", "password", "university", "semester"].find(
-      (k) => !String(form[k] || "").trim()
-    );
+
+    const required = ["fullName", "email", "password", "university", "major", "semester"];
+    const missing = required.find((k) => !String(form[k] || "").trim());
     if (missing) {
       setToast(`Please fill the required field: ${missing}`);
+      return;
+    }
+
+    if (!strongPasswordRegex.test(form.password)) {
+      setToast(
+        "Password must be at least 8 characters and include upper, lower, number, and symbol."
+      );
       return;
     }
 
@@ -56,10 +66,9 @@ export default function StudentRegister() {
 
     setLoading(true);
     try {
-      // Let Axios set the Content-Type automatically (with boundary)
       await api.post("/auth/register/student", data);
-
       setToast("Registered! Await admin verification.");
+
       setForm({
         fullName: "",
         email: "",
@@ -70,11 +79,12 @@ export default function StudentRegister() {
       });
       setIdFile(null);
     } catch (err) {
-      const server = err.response?.data;
-      console.log("Register error:", server); // helpful in dev tools
+      const res = err.response?.data;
+      console.log("Register error:", res);
       const msg =
-        server?.message ||
-        server?.errors?.[0]?.msg || // first express-validator error
+        res?.message ||
+        (res?.errors &&
+          res.errors.map((e) => `${e.path || e.param}: ${e.msg}`).join(", ")) ||
         "Registration failed";
       setToast(msg);
     } finally {
@@ -115,6 +125,7 @@ export default function StudentRegister() {
                 value={form.password}
                 onChange={update}
                 required
+                hint="At least 8 chars, with upper, lower, number, and symbol."
               />
               <Input
                 label="University"
@@ -139,6 +150,11 @@ export default function StudentRegister() {
                 required
               />
               <FileDrop label="Student ID Card" onFile={setIdFile} />
+              {idFile && (
+                <p className="text-xs text-gray-500">
+                  Selected file: {idFile.name}
+                </p>
+              )}
               <Button type="submit" loading={loading}>
                 Create account
               </Button>
