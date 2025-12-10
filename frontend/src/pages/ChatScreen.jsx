@@ -16,9 +16,6 @@ import CallModal from "../components/CallModal";
 import CallWindow from "../components/CallWindow";
 
 
-// import useCall from "../hooks/useCall";
-// import CallModal from "../components/CallModal";
-// import CallWindow from "../components/CallWindow";
 
 export default function ChatScreen() {
   const navigate = useNavigate();
@@ -32,6 +29,42 @@ export default function ChatScreen() {
   setAuthToken(token);
 
   const socket = useContext(SocketContext);
+
+  const {
+  incomingCall,
+  inCall,
+  startCall,
+  acceptCall,
+  rejectCall,
+  endCall,
+  remoteAudioRef
+} = useCall(socket, user);
+
+
+// Call status UI states
+const [callStatus, setCallStatus] = useState(null);
+const [callDuration, setCallDuration] = useState(0);
+const callTimerRef = useRef(null);
+
+// Handle call timer
+useEffect(() => {
+  if (inCall) {
+    setCallStatus("connected");
+
+    callTimerRef.current = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+  } else {
+    clearInterval(callTimerRef.current);
+    setCallDuration(0);
+  }
+
+  return () => clearInterval(callTimerRef.current);
+}, [inCall]);
+
+
+
+    
 
   // -----------------------------------------
   // STATE
@@ -75,16 +108,7 @@ export default function ChatScreen() {
   const apiBase = (api?.defaults?.baseURL || "").replace(/\/$/, "");
   const serverOrigin = apiBase.replace(/\/api$/i, "");
 
-const {
-  incomingCall,
-  inCall,
-  startCall,
-  acceptCall,
-  rejectCall,
-  endCall,
-  localVideoRef,
-  remoteVideoRef
-} = useCall(socket, user);
+
 
 
   // -----------------------------------------
@@ -493,7 +517,26 @@ function stopRecording() {
                   ? "Online"
                   : "Offline"}
               </p>
-            </div>
+              
+              </div>
+
+              <button
+  onClick={() => {
+    // If partner is online → ringing, else → calling
+    if (theirStatus === "online") {
+      setCallStatus("ringing");
+    } else {
+      setCallStatus("calling");
+    }
+
+    startCall(activePartnerId, activePartnerName);
+  }}
+  className="ml-auto px-4 py-2 bg-[#0EA5E9] hover:bg-[#0284C7] rounded shadow text-white"
+>
+  📞 Voice Call
+</button>
+
+
 
             {/* Calling temporarily disabled
             <button
@@ -784,34 +827,41 @@ function stopRecording() {
         </div>
       )}
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+            <Toast message={toast} onClose={() => setToast(null)} />
 
-      {/* CALL UI (disabled) */}
-      {/* {call.incoming && (
-        <CallModal
-          state="incoming"
-          fromUser={activePartnerName}
-          onAccept={call.acceptCall}
-          onDecline={call.rejectCall}
-          status={call.status}
-        />
-      )}
+      {/* INCOMING CALL MODAL */}
+{incomingCall && (
+  <CallModal
+    incoming={true}
+    name={incomingCall.fromName}
+    onAccept={acceptCall}
+    onReject={rejectCall}
+  />
+)}
 
-      {call.calling && (
-        <CallModal
-          state="outgoing"
-          fromUser={activePartnerName}
-          onEnd={call.cancelCall}
-          status={call.status}
-        />
-      )}
+{/* OUTGOING CALL MODAL (Calling / Ringing) */}
+{!incomingCall && !inCall && callStatus && (
+  <CallModal
+    incoming={false}
+    name={activePartnerName}
+    status={callStatus} // “calling” or “ringing”
+    onReject={() => {
+      endCall();
+      setCallStatus(null);
+    }}
+  />
+)}
 
-      <CallWindow
-        visible={call.inCall}
-        localStream={call.localStreamRef.current}
-        remoteStream={call.remoteStreamRef.current}
-        onEnd={call.endCall}
-      /> */}
+{/* ACTIVE CALL WINDOW */}
+{inCall && (
+  <CallWindow
+    visible={true}
+    remoteAudioRef={remoteAudioRef}
+    duration={callDuration}  // FIXED
+    onEnd={endCall}
+  />
+)}
+
     </div>
   );
 }
