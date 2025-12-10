@@ -1,3 +1,4 @@
+// server/src/middleware/upload.js
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -5,13 +6,16 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const storage = multer.diskStorage({
+// ---------------- ID CARD UPLOAD (existing) ----------------
+const idStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, "..", "..", "uploads", "idcards"));
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || ".jpg";
-    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+    const safeName = `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}${ext}`;
     cb(null, safeName);
   },
 });
@@ -21,4 +25,27 @@ const fileFilter = (req, file, cb) => {
   cb(ok ? null : new Error("Only JPG/PNG/WEBP allowed"), ok);
 };
 
-export const uploadIdCard = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+export const uploadIdCard = multer({
+  storage: idStorage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// ---------------- CHAT ATTACHMENT UPLOAD (NEW) ----------------
+const chatStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "..", "..", "uploads", "chat"));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || "";
+    const name = `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}${ext}`;
+    cb(null, name);
+  },
+});
+
+export const uploadChatAttachment = multer({
+  storage: chatStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+});

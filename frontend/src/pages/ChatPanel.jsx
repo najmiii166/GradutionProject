@@ -1,0 +1,214 @@
+// src/components/ChatPanel.jsx
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api/axios";
+import Spinner from "./Spinner";
+import Toast from "./Toast";
+import { createSocket } from "../socket";
+
+export default function ChatPanel({ currentUserId, initialTarget }) {
+  const role = localStorage.getItem("role");
+  const [conversations, setConversations] = useState([]);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+
+  const [selectedConvId, setSelectedConvId] = useState("");
+  const [selectedPartner, setSelectedPartner] = useState(null);
+
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
+  const [input, setInput] = useState("");
+  const [toast, setToast] = useState(null);
+
+  const socketRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  const listUrl = role === "student" ? "/chat/student" : "/chat/mentor";
+
+  const loadConversations = async () => {
+    try {
+      setLoadingConversations(true);
+      const { data } = await api.get(listUrl);
+      setConversations(data || []);
+    } catch (err) {
+      console.error("Conversations error:", err);
+      setToast("Failed to load conversations.");
+    } finally {
+      setLoadingConversations(false);
+    }
+  };
+
+  const loadMessages = async (conversationId, { silent = false } = {}) => {
+    if (!conversationId) return;
+    try {
+      if (!silent) setLoadingMessages(true);
+      const { data } = await api.get(`/chat/${conversationId}/messages`);
+      setMessages(data || []);
+    } catch (err) {
+      console.error("Messages load error:", err);
+      setToast("Failed to load messages.");
+    } finally {
+      if (!silent) setLoadingMessages(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  useEffect(() => {
+    const s = createSocket();
+    socketRef.current = s;
+    return () => {
+      s.disconnect();
+      socketRef.current = null;
+    };
+  }, []);
+
+  // if initialTarget given (likely { id, name }), open/create conversation
+  useEffect(() => {
+    (async () => {
+      if (!initialTarget?.id) return;
+      try {
+        const mentorId = role === "student" ? initialTarget.id : (currentUserId || null);
+        const studentId = role === "student" ? (currentUserId || null) : initialTarget.id;
+        if (!mentorId || !studentId) return;
+        const { data } = await api.post("/chat/open", { mentorId, studentId });
+        if (data && data._id) {
+          setSelectedConvId(data._id);
+          setSelectedPartner({ _id: initialTarget.id, fullName: initialTarget.name });
+          await loadMessages(data._id);
+        }
+      } catch (e) {
+        console.error("Open convo error:", e);
+      }
+    })();
+  }, [initialTarget?.id, currentUserId]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !selectedConvId) return;
+
+    socket.emit("join_conversation", { conversationId: selectedConvId });
+
+    const handleNewMessage = (msg) => {
+      if (String(msg.conversationId) === String(selectedConvId)) {
+        setMessages((prev) => [...prev, msg]);
+      }
+      // update conversation preview
+      setConversations((prev) =>
+        (prev || []).map((c) => (c._id === msg.conversationId ? { ...c, lastMessage: msg.text, lastMessageAt: msg.createdAt } : c))
+      );
+    };
+
+    socket.on("new_message", handleNewMessage);
+
+    return () => {
+      socket.emit("leave_conversation", { conversationId: selectedConvId });
+      socket.off("new_message", handleNewMessage);
+    };
+  }, [selectedConvId]);
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const handleSelectConversation = (conv) => {
+    const partnerName = conv.studentName || conv.mentorName || "User";
+    setSelectedPartner({ _id: conv._id, fullName: partnerName });
+    setSelectedConvId(conv._id);
+    loadMessages(conv._id);
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    const txt = input.trim();
+    if (!txt || !selectedConvId) return;
+    try {
+      const { data } = await api.post(`/chat/${selectedConvId}/messages`, { text: txt });
+      setMessages((prev) => [...prev, data]);
+      setInput("");
+    } catch (err) {
+      console.error("Send message error:", err);
+      setToast("Failed to send message.");
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)] gap-4">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 flex flex-col">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-slate-200">Conversations</h3>
+          <button onClick={loadConversations} className="text-[10px] text-slate-400 hover:text-slate-200">Refresh</button>
+        </div>
+
+        {loadingConversations ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Spinner className="border-white/60" />
+          </div>
+        ) : conversations.length === 0 ? (
+          <p className="text-xs text-slate-400">No conversations yet.</p>
+        ) : (
+          <ul className="flex-1 overflow-y-auto space-y-1">
+            {conversations.map((c) => (
+              <li key={c._id}>
+                <button
+                  onClick={() => handleSelectConversation(c)}
+                  className={`w-full text-left rounded-xl px-3 py-2 text-xs ${selectedConvId === c._id ? "bg-sky-500/20 border border-sky-500/60 text-sky-100" : "bg-slate-900/70 border border-slate-800 text-slate-200 hover:bg-slate-900"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{c.studentName || c.mentorName}</span>
+                    {c.lastMessageAt && (<span className="text-[10px] text-slate-400">{new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>)}
+                  </div>
+                  {c.lastMessage && (<p className="mt-0.5 text-[11px] text-slate-400 truncate">{c.lastMessage}</p>)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 flex flex-col">
+        {selectedConvId && selectedPartner ? (
+          <>
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Chat</p>
+                <p className="text-xs font-semibold text-slate-100">{selectedPartner.fullName}</p>
+              </div>
+            </div>
+
+            <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-1">
+              {loadingMessages ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400"><Spinner className="border-white/60" /><span>Loading messages…</span></div>
+              ) : messages.length === 0 ? (
+                <p className="text-[11px] text-slate-400">No messages yet. Send the first message.</p>
+              ) : (
+                messages.map((m) => {
+                  const senderId = m.sender?._id || m.sender;
+                  const isMe = String(senderId) === String(currentUserId);
+                  return (
+                    <div key={m._id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[75%] rounded-2xl px-3 py-1.5 text-xs ${isMe ? "bg-sky-500 text-white" : "bg-slate-700 text-slate-50"}`}>
+                        <p>{m.text}</p>
+                        <p className="mt-0.5 text-[9px] opacity-70 text-right">{m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <form className="flex items-center gap-2 mt-1" onSubmit={handleSend}>
+              <input type="text" className="flex-1 rounded-full bg-slate-900/80 border border-slate-600 px-3 py-1.5 text-xs text-white outline-none focus:ring-1 focus:ring-sky-400" placeholder="Type a message…" value={input} onChange={(e) => setInput(e.target.value)} />
+              <button type="submit" className="rounded-full bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-400 disabled:opacity-50" disabled={!input.trim()}>Send</button>
+            </form>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-xs text-slate-400">Select a conversation to start chatting.</div>
+        )}
+      </div>
+
+      <Toast message={toast} onClose={() => setToast(null)} type={toast?.toLowerCase().includes("fail") ? "error" : "info"} />
+    </div>
+  );
+}

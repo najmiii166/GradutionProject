@@ -1,3 +1,4 @@
+// frontend/src/api/axios.js
 import axios from "axios";
 
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -10,4 +11,9 @@ export const api = axios.create({
 export function setAuthToken(token) {
   if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   else delete api.defaults.headers.common["Authorization"];
+};
+
+const storedToken = localStorage.getItem("token");
+if (storedToken) {
+  setAuthToken(storedToken);
 }

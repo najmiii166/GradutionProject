@@ -1,3 +1,4 @@
+// server/src/seed/seedAdmin.js
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { connectDB } from "../config/db.js";

@@ -1,3 +1,4 @@
+// server/src/models/MentorProfile.js
 import mongoose from "mongoose";
 
 const MentorProfileSchema = new mongoose.Schema(
@@ -8,7 +9,14 @@ const MentorProfileSchema = new mongoose.Schema(
     department: { type: String, required: true },
     yearsOfExperience: { type: Number, min: 0, required: true },
     bio: { type: String, maxlength: 1000 },
-    expertiseAreas: [{ type: String, trim: true }]
+    expertiseAreas: [{ type: String, trim: true }],
+    availability: [
+      {
+        day: { type: String },
+        from: { type: String },
+        to: { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );
