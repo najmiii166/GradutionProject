@@ -1,23 +1,25 @@
-// frontend/src/hooks/useCall.js
 import { useEffect, useRef, useState } from "react";
 
 export default function useCall(socket, user) {
   const [incomingCall, setIncomingCall] = useState(null);
   const [inCall, setInCall] = useState(false);
+  const [callStatus, setCallStatus] = useState(null); // calling | ringing | connected
 
   const peerRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const localStreamRef = useRef(null);
-
   const targetIdRef = useRef(null);
 
+  // ------------------------
   // START CALL
+  // ------------------------
   async function startCall(targetId) {
     targetIdRef.current = targetId;
+    setCallStatus("calling");
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: false
+      video: false,
     });
 
     localStreamRef.current = stream;
@@ -34,20 +36,21 @@ export default function useCall(socket, user) {
       fromId: user._id,
       fromName: user.fullName,
       targetId,
-      offer
+      offer,
     });
-
-    setInCall(true);
   }
 
+  // ------------------------
   // ACCEPT CALL
+  // ------------------------
   async function acceptCall() {
     const { fromId, offer } = incomingCall;
+
     targetIdRef.current = fromId;
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: false
+      video: false,
     });
 
     localStreamRef.current = stream;
@@ -58,12 +61,14 @@ export default function useCall(socket, user) {
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
     await pc.setRemoteDescription(offer);
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
     socket.emit("call:answer", { targetId: fromId, answer });
 
     setIncomingCall(null);
+    setCallStatus("connected");
     setInCall(true);
   }
 
@@ -71,19 +76,22 @@ export default function useCall(socket, user) {
     if (!incomingCall) return;
     socket.emit("call:reject", { targetId: incomingCall.fromId });
     setIncomingCall(null);
+    setCallStatus(null);
   }
 
-  // WEBRTC PEER
+  // ------------------------
+  // CREATE PEER
+  // ------------------------
   function createPeer(targetId) {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         socket.emit("call:ice-candidate", {
           targetId,
-          candidate: e.candidate
+          candidate: e.candidate,
         });
       }
     };
@@ -97,7 +105,9 @@ export default function useCall(socket, user) {
     return pc;
   }
 
+  // ------------------------
   // END CALL
+  // ------------------------
   function endCall() {
     peerRef.current?.close();
     peerRef.current = null;
@@ -107,20 +117,32 @@ export default function useCall(socket, user) {
 
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
 
-    setInCall(false);
     setIncomingCall(null);
+    setInCall(false);
+    setCallStatus(null);
 
     if (targetIdRef.current) {
       socket.emit("call:end", { targetId: targetIdRef.current });
     }
   }
 
-  // SOCKET LISTENERS
+  // ------------------------
+  // SOCKET EVENTS
+  // ------------------------
   useEffect(() => {
     if (!socket) return;
 
     socket.on("call:incoming", ({ fromId, fromName, offer }) => {
       setIncomingCall({ fromId, fromName, offer });
+    });
+
+    socket.on("call:ringing", () => {
+      setCallStatus("ringing");
+    });
+
+    socket.on("call:accepted", () => {
+      setCallStatus("connected");
+      setInCall(true);
     });
 
     socket.on("call:answer", async ({ answer }) => {
@@ -136,6 +158,8 @@ export default function useCall(socket, user) {
 
     return () => {
       socket.off("call:incoming");
+      socket.off("call:ringing");
+      socket.off("call:accepted");
       socket.off("call:answer");
       socket.off("call:ice-candidate");
       socket.off("call:rejected");
@@ -146,10 +170,12 @@ export default function useCall(socket, user) {
   return {
     incomingCall,
     inCall,
+    callStatus,
+    setCallStatus,
     startCall,
     acceptCall,
     rejectCall,
     endCall,
-    remoteAudioRef
+    remoteAudioRef,
   };
 }

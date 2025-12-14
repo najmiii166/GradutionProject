@@ -40,30 +40,28 @@ export default function ChatScreen() {
   acceptCall,
   rejectCall,
   endCall,
-  remoteAudioRef
+  remoteAudioRef,
+  callStatus,
+  setCallStatus
 } = useCall(socket, user);
 
 
-// Call status UI states
-const [callStatus, setCallStatus] = useState(null);
+// CALL DURATION TIMER
+
 const [callDuration, setCallDuration] = useState(0);
 const callTimerRef = useRef(null);
 
-// Handle call timer
+// call  TIMER
 useEffect(() => {
-  if (inCall) {
-    setCallStatus("connected");
-
+  if (callStatus === "connected" && inCall) {
     callTimerRef.current = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
+      setCallDuration(prev => prev + 1);
     }, 1000);
   } else {
     clearInterval(callTimerRef.current);
     setCallDuration(0);
   }
-
-  return () => clearInterval(callTimerRef.current);
-}, [inCall]);
+}, [callStatus, inCall]);
 
 
 
@@ -284,46 +282,45 @@ useEffect(() => {
   // SEND MESSAGE
   // -----------------------------------------
   const sendMessage = async () => {
-    if (!text.trim() && !attachment) return;
+  if (!text.trim() && !attachment) return;
 
-    try {
-      let form = new FormData();
+  try {
+    let form = new FormData();
 
-      if (attachment) {
-        // attachment may be a File or an object { file, duration }
-        const fileToSend = attachment.file || attachment;
-        form.append("file", fileToSend);
+    if (attachment) {
+      const fileToSend = attachment.file || attachment;
+      form.append("file", fileToSend);
 
-        // Audio duration support (if provided)
-        const duration = attachment.duration || fileToSend.duration;
-        if (duration) {
-          form.append("duration", duration);
-        }
-      }
-
-      if (text.trim()) form.append("text", text);
-
-      const { data } = await api.post(
-        `/chat/${activeConversationId}/messages`,
-        form,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
-
-      // Immediately append the posted message so sender sees it without reload
-      
-      // reset
-      setText("");
-      setAttachment(null);
-      if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
-      setAttachmentPreview(null);
-
-    } catch (err) {
-      console.error(err);
-      setToast("Failed to send message");
+      const duration = attachment.duration || fileToSend.duration;
+      if (duration) form.append("duration", duration);
     }
-  };
+
+    if (text.trim()) form.append("text", text);
+
+    const { data } = await api.post(
+      `/chat/${activeConversationId}/messages`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    //---------------------------------------------------
+    // ⭐ FIX: instantly add message to screen
+    //---------------------------------------------------
+    setMessages(prev => [...prev, data]);
+
+    //---------------------------------------------------
+    // reset
+    //---------------------------------------------------
+    setText("");
+    setAttachment(null);
+    if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+    setAttachmentPreview(null);
+
+  } catch (err) {
+    console.error(err);
+    setToast("Failed to send message");
+  }
+};
 
 
   // -----------------------------------------
@@ -577,16 +574,12 @@ function stopRecording() {
               </div>
             </button>
 
-              <button
+            <button
   onClick={() => {
-    // If partner is online → ringing, else → calling
-    if (theirStatus === "online") {
-      setCallStatus("ringing");
-    } else {
-      setCallStatus("calling");
-    }
+    // UI updates instantly
+    setCallStatus(theirStatus === "online" ? "ringing" : "calling");
 
-    startCall(activePartnerId, activePartnerName);
+    startCall(activePartnerId);
   }}
   className="ml-auto px-4 py-2 bg-[#0EA5E9] hover:bg-[#0284C7] rounded shadow text-white"
 >
@@ -911,18 +904,18 @@ function stopRecording() {
   />
 )}
 
-{/* OUTGOING CALL MODAL (Calling / Ringing) */}
+{/* OUTGOING CALL MODAL */}
 {!incomingCall && !inCall && callStatus && (
   <CallModal
     incoming={false}
     name={activePartnerName}
-    status={callStatus} // “calling” or “ringing”
+    status={callStatus} 
     onReject={() => {
       endCall();
-      setCallStatus(null);
     }}
   />
 )}
+
 
 {/* ACTIVE CALL WINDOW */}
 {inCall && (

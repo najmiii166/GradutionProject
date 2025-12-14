@@ -12,15 +12,16 @@ import mentorRoutes from "./routes/mentor.routes.js";
 import requestRoutes from "./routes/request.route.js";
 import userRoutes from "./routes/user.route.js";
 import chatRoutes from "./routes/chat.routes.js";
+
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
+
 import socketAuth from "./middleware/socketAuth.js";
 import httpProxy from "http-proxy";
 import { URL } from "url";
-// Proxy to Vite dev server (for HMR) when frontend is loaded through backend port
-const viteProxy = httpProxy.createProxyServer({ target: "http://localhost:5174", ws: true, changeOrigin: true });
+
 import Message from "./models/Message.js";
 import Conversation from "./models/Conversation.js";
 
@@ -29,30 +30,35 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Allow frontend to be configured via env, fallback to common dev ports
+// CORS ORIGINS
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
-const allowedOrigins = [FRONTEND_ORIGIN, "http://localhost:5173", "http://localhost:5174"].filter(Boolean);
+const allowedOrigins = [
+  FRONTEND_ORIGIN,
+  "http://localhost:5173",
+  "http://localhost:5174",
+];
 
 console.log("Allowed CORS origins:", allowedOrigins);
 
+// MIDDLEWARE
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // allow requests with no origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("CORS: Origin not allowed"));
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("CORS blocked"));
     },
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(morgan("dev"));
 
-// Serve uploaded files
+// STATIC FILES
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
-// ------------------ ROUTES ------------------
+// ROUTES
 app.use("/api", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
@@ -60,24 +66,33 @@ app.use("/api/student", studentRoutes);
 app.use("/api/mentor", mentorRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/users", userRoutes);
-
-// Chat route
 app.use("/api/chat", chatRoutes);
 
 app.get("/", (_, res) => res.send("MentorLink API"));
 
-// Create HTTP server and attach Socket.IO
+// HTTP SERVER
 const server = http.createServer(app);
 
+// SOCKET.IO
 const io = new Server(server, {
   cors: { origin: allowedOrigins, credentials: true },
 });
 
-io.use(socketAuth); // authenticate socket connections
+io.use(socketAuth);
 
+// --------------------------------------------
+// ✅ ALL SOCKET LOGIC HERE — CLEAN + WORKING
+// --------------------------------------------
 io.on("connection", (socket) => {
-  console.log("🔌 Socket connected:", socket.id);
+  console.log("🔌 User connected:", socket.id);
 
+  // PRIVATE ROOM FOR CALLS
+  const userId = socket.user?._id;
+  if (userId) socket.join(userId);
+
+  // ------------------------------
+  // JOIN / LEAVE CHAT ROOM
+  // ------------------------------
   socket.on("join_conversation", ({ conversationId }) => {
     socket.join(conversationId);
   });
@@ -86,163 +101,142 @@ io.on("connection", (socket) => {
     socket.leave(conversationId);
   });
 
-  // Handle message edits coming from clients
-  socket.on("message:edit", async (data) => {
+  // ------------------------------
+  // MESSAGE EDIT
+  // ------------------------------
+  socket.on("message:edit", async ({ messageId, text }) => {
     try {
-      const { messageId, text } = data || {};
       if (!messageId || typeof text !== "string") return;
 
       const msg = await Message.findById(messageId);
       if (!msg) return;
 
-      // Only original sender may edit
       if (String(msg.sender) !== String(socket.user.id)) return;
 
       msg.text = text;
       msg.edited = true;
       await msg.save();
 
-      const populated = await msg.populate("sender", "fullName _id");
+      const updated = await msg.populate("sender", "fullName _id");
 
-      // Emit updated message to the conversation room
-      socket.to(msg.conversation.toString()).emit("message:updated", populated.toObject());
-      socket.emit("message:updated", populated.toObject());
+      io.to(msg.conversation.toString()).emit("message:updated", updated.toObject());
     } catch (err) {
-      console.error("message:edit handler error:", err);
+      console.error("message:edit error:", err);
     }
   });
 
-  // Handle message deletes (soft delete)
-  socket.on("message:delete", async (data) => {
+  // ------------------------------
+  // MESSAGE DELETE
+  // ------------------------------
+  socket.on("message:delete", async ({ messageId }) => {
     try {
-      const { messageId } = data || {};
       if (!messageId) return;
 
       const msg = await Message.findById(messageId);
       if (!msg) return;
 
-      // Only original sender may delete
       if (String(msg.sender) !== String(socket.user.id)) return;
 
       msg.deleted = true;
       msg.text = "";
       await msg.save();
 
-      const payload = { _id: msg._id, conversationId: msg.conversation };
-
-      socket.to(msg.conversation.toString()).emit("message:deleted", payload);
-      socket.emit("message:deleted", payload);
+      io.to(msg.conversation.toString()).emit("message:deleted", {
+        _id: msg._id,
+        conversationId: msg.conversation,
+      });
     } catch (err) {
-      console.error("message:delete handler error:", err);
+      console.error("message:delete error:", err);
     }
   });
 
+// ------------------------------
+// CALL SIGNALING
+// ------------------------------
+socket.on("call:offer", (data) => {
+  // Notify callee of incoming call
+  io.to(data.targetId).emit("call:incoming", {
+    fromId: data.fromId,
+    fromName: data.fromName,
+    offer: data.offer,
+  });
+
+  // Notify caller that callee is ringing
+  io.to(data.fromId).emit("call:ringing");
+});
+
+socket.on("call:answer", (data) => {
+  // Send answer to caller
+  io.to(data.targetId).emit("call:answer", {
+    answer: data.answer,
+  });
+
+  // Notify caller that call is now connected
+  io.to(data.targetId).emit("call:accepted");
+});
+
+socket.on("call:ice-candidate", ({ targetId, candidate }) => {
+  io.to(targetId).emit("call:ice-candidate", { candidate });
+});
+
+socket.on("call:reject", ({ targetId }) => {
+  io.to(targetId).emit("call:rejected");
+});
+
+socket.on("call:end", ({ targetId }) => {
+  io.to(targetId).emit("call:ended");
+});
+
+  // ------------------------------
+  // DISCONNECT
+  // ------------------------------
   socket.on("disconnect", () => {
-    console.log("❌ Socket disconnected:", socket.id);
+    console.log("❌ User disconnected:", socket.id);
   });
 });
 
-// Make io available inside routes
-app.set("io", io);
-
-// Proxy non-API and non-upload requests to Vite dev server so HMR works
-app.use((req, res, next) => {
-  try {
-    const url = req.url || "";
-
-    // Don't proxy API, uploads or backend socket.io paths
-    if (url.startsWith("/api") || url.startsWith("/uploads") || url.startsWith("/socket.io")) return next();
-
-    // Proxy everything else to Vite (dev server)
-    viteProxy.web(req, res, (err) => {
-      console.error("Vite proxy error (web):", err && err.message);
-      res.statusCode = 502;
-      res.end("Bad Gateway (Vite proxy)");
-    });
-  } catch (err) {
-    next(err);
-  }
+// --------------------------------------------
+// VITE PROXY FOR FRONTEND HMR
+// --------------------------------------------
+const viteProxy = httpProxy.createProxyServer({
+  target: "http://localhost:5174",
+  ws: true,
+  changeOrigin: true,
 });
 
+// Proxy non-API requests to Vite
+app.use((req, res, next) => {
+  const url = req.url || "";
+  if (url.startsWith("/api") || url.startsWith("/uploads") || url.startsWith("/socket.io"))
+    return next();
+
+  viteProxy.web(req, res, (err) => {
+    console.error("Vite proxy error:", err?.message);
+    res.statusCode = 502;
+    res.end("Bad Gateway (Proxy)");
+  });
+});
+
+// WS proxy (HMR)
+server.on("upgrade", (req, socket, head) => {
+  const reqUrl = new URL(req.url || "", `http://localhost`);
+  if (reqUrl.pathname.startsWith("/socket.io")) return;
+
+  viteProxy.ws(req, socket, head);
+});
+
+// --------------------------------------------
+// START SERVER
+// --------------------------------------------
 const port = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
-    // Handle websocket upgrade proxying for HMR (forward to Vite) except backend socket.io
-    server.on("upgrade", (req, socket, head) => {
-      try {
-        const reqUrl = new URL(req.url || "", `http://localhost`);
-        if (reqUrl.pathname && reqUrl.pathname.startsWith("/socket.io")) {
-          // Let the server's Socket.IO handle this upgrade
-          return;
-        }
-
-        // Otherwise forward upgrade (HMR websocket) to Vite dev server
-        viteProxy.ws(req, socket, head);
-      } catch (err) {
-        console.error("Upgrade proxy error:", err && err.message);
-        socket.destroy();
-      }
-    });
-
     server.listen(port, () =>
-      console.log(`API + Socket running on http://localhost:${port}`)
+      console.log(`🚀 Server + Socket running on http://localhost:${port}`)
     );
   })
-  .catch((e) => {
-    console.error("DB connect error:", e);
+  .catch((err) => {
+    console.error("DB connection error:", err);
     process.exit(1);
   });
-
-
-  
-  io.on("connection", (socket) => {
-  console.log("🔌 User connected:", socket.id);
-
-  // JOIN SPECIFIC USER ROOM
-  const userId = socket.user?._id;
-  if (userId) socket.join(userId);
-
-  // ------------------------------
-  // CALL: SEND OFFER
-  // ------------------------------
-  socket.on("call:offer", (data) => {
-    io.to(data.targetId).emit("call:incoming", {
-      fromId: data.fromId,
-      fromName: data.fromName,
-      offer: data.offer,
-    });
-  });
-
-  // ------------------------------
-  // CALL: SEND ANSWER
-  // ------------------------------
-  socket.on("call:answer", (data) => {
-    io.to(data.targetId).emit("call:answer", {
-      answer: data.answer,
-    });
-  });
-
-  // ------------------------------
-  // CALL: ICE CANDIDATES
-  // ------------------------------
-  socket.on("call:ice-candidate", (data) => {
-    io.to(data.targetId).emit("call:ice-candidate", {
-      candidate: data.candidate,
-    });
-  });
-
-  // ------------------------------
-  // CALL: REJECT CALL
-  // ------------------------------
-  socket.on("call:reject", (data) => {
-    io.to(data.targetId).emit("call:rejected");
-  });
-
-  // ------------------------------
-  // CALL: END CALL
-  // ------------------------------
-  socket.on("call:end", (data) => {
-    io.to(data.targetId).emit("call:ended");
-  });
-});
