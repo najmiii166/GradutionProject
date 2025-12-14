@@ -253,6 +253,145 @@ router.get("/students/:id", auth, requireRole("mentor"), async (req, res) => {
 });
 
 /* =======================================================
+   GET MENTOR PROFILE (Student View)
+   Allows a student to fetch a mentor's public profile by user id
+======================================================== */
+router.get("/mentors/:id", auth, requireRole("student"), async (req, res) => {
+  try {
+    const mentorId = req.params.id;
+
+    const mentorProfile = await MentorProfile.findOne({ user: mentorId })
+      .populate("user", "fullName email university")
+      .lean();
+
+    if (!mentorProfile) {
+      return res.status(404).json({ message: "Mentor profile not found." });
+    }
+
+    return res.json({
+      userId: mentorProfile.user?._id,
+      fullName: mentorProfile.user?.fullName || "Unknown",
+      email: mentorProfile.user?.email || "",
+      university: mentorProfile.user?.university || "",
+      institution: mentorProfile.institution || "",
+      faculty: mentorProfile.faculty || "",
+      department: mentorProfile.department || "",
+      bio: mentorProfile.bio || "",
+      yearsOfExperience: mentorProfile.yearsOfExperience || 0,
+      expertiseAreas: mentorProfile.expertiseAreas || [],
+      availability: mentorProfile.availability || [],
+      averageRating: mentorProfile.averageRating || 0,
+      totalRatings: mentorProfile.totalRatings || 0,
+      // compute percent of positive ratings (4 or 5)
+      percentPositive: (() => {
+        try {
+          const arr = mentorProfile.ratings || [];
+          if (!arr.length) return 0;
+          const ok = arr.filter((r) => (r.score || 0) >= 4).length;
+          return Math.round((ok / arr.length) * 100);
+        } catch (e) {
+          return 0;
+        }
+      })(),
+      // compute a simple badge
+      badge: (() => {
+        try {
+          const avg = mentorProfile.averageRating || 0;
+          const total = mentorProfile.totalRatings || 0;
+          if (avg >= 4.7 && total >= 10) return "Top Mentor";
+          if (avg >= 4.5 && total >= 5) return "Highly Rated";
+          if (avg >= 4 && total >= 3) return "Recommended";
+          return "—";
+        } catch (e) {
+          return "—";
+        }
+      })(),
+    });
+  } catch (err) {
+    console.error("GET mentor profile error:", err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+});
+
+/* =======================================================
+   RATE A MENTOR (student -> mentor)
+   POST /api/mentor/mentors/:id/rate
+   body: { score: number (1-5), comment?: string }
+======================================================== */
+router.post("/mentors/:id/rate", auth, requireRole("student"), async (req, res) => {
+  try {
+    const mentorUserId = req.params.id;
+    const { score, comment } = req.body;
+
+    const parsed = Number(score);
+    if (!parsed || parsed < 1 || parsed > 5) return res.status(400).json({ message: "Score must be 1-5" });
+
+    const profile = await MentorProfile.findOne({ user: mentorUserId });
+    if (!profile) return res.status(404).json({ message: "Mentor profile not found" });
+
+    const existing = profile.ratings.find((r) => String(r.user) === String(req.user.id));
+    if (existing) {
+      existing.score = parsed;
+      if (comment !== undefined) existing.comment = comment;
+      existing.createdAt = new Date();
+    } else {
+      profile.ratings.push({ user: req.user.id, score: parsed, comment });
+    }
+
+    // Recalculate cached stats
+    const total = profile.ratings.length;
+    const sum = profile.ratings.reduce((s, r) => s + (r.score || 0), 0);
+    profile.totalRatings = total;
+    profile.averageRating = total ? Math.round((sum / total) * 10) / 10 : 0; // 1 decimal
+
+    await profile.save();
+
+    return res.json({
+      success: true,
+      averageRating: profile.averageRating,
+      totalRatings: profile.totalRatings,
+    });
+  } catch (err) {
+    console.error("Rate mentor error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* =======================================================
+   GET RATINGS FOR A MENTOR (public)
+   GET /api/mentor/mentors/:id/ratings
+   returns array of { userId, userName, userRole, score, comment, createdAt, isNowMentor }
+======================================================== */
+router.get("/mentors/:id/ratings", async (req, res) => {
+  try {
+    const mentorUserId = req.params.id;
+
+    const profile = await MentorProfile.findOne({ user: mentorUserId }).populate({
+      path: "ratings.user",
+      model: "User",
+      select: "fullName role",
+    }).lean();
+
+    if (!profile) return res.status(404).json({ message: "Mentor profile not found" });
+
+    const list = (profile.ratings || []).map((r) => ({
+      userId: r.user?._id || r.user,
+      userName: r.user?.fullName || "Anonymous",
+      userRole: r.user?.role || null,
+      score: r.score || 0,
+      comment: r.comment || "",
+      createdAt: r.createdAt || r._id?.getTimestamp?.() || null,
+      isNowMentor: (r.user && r.user.role === "mentor") || false,
+    })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return res.json(list);
+  } catch (err) {
+    console.error("GET mentor ratings error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* =======================================================
    STATS / DUMMY ROUTES (avoid dashboard 404s)
 ======================================================= */
 router.get("/stats", (req, res) =>

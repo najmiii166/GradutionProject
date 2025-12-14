@@ -317,10 +317,6 @@ export default function MentorDashboard() {
           onClick={() => setMentorModalOpen(true)}
           className="flex items-center gap-3"
         >
-          <span className="hidden sm:block text-sm text-slate-200 font-medium">
-            {fullName}
-          </span>
-
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-semibold text-white shadow-md">
             {getInitials(fullName)}
           </div>
@@ -346,7 +342,7 @@ export default function MentorDashboard() {
           <MentorKPICard
             icon={Star}
             label="Avg Rating"
-            value={stats?.averageRating || "0.0"}
+            value={stats?.averageRating ? Number(stats.averageRating).toFixed(1) : "0.0"}
             color="from-amber-400 to-yellow-500"
           />
           <MentorKPICard

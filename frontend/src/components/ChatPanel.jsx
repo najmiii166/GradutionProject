@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/axios";
 import Spinner from "./Spinner";
 import Toast from "./Toast";
+import MentorProfileModal from "./mentor/MentorProfileModal";
+import StudentProfileModal from "./mentor/StudentProfileModal";
 import { createSocket } from "../socket";
 
 export default function ChatPanel({ currentUserId, initialTarget }) {
@@ -135,9 +137,59 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
   const handleSelectConversation = (conv) => {
     const partnerName = conv.studentName || conv.mentorName || "User";
 
+    // set conversation selected (messages) — we'll lazily resolve the partner id when needed
     setSelectedPartner({ _id: conv._id, fullName: partnerName });
     setSelectedConvId(conv._id);
     loadMessages(conv._id);
+  };
+
+  // Profile modal state
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [profileType, setProfileType] = useState(null); // 'mentor' | 'student'
+
+  // Open a participant's profile for a given conversation id or object
+  const openProfile = async (convOrId, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    try {
+      setProfileOpen(true);
+      setProfileLoading(true);
+      setProfileData(null);
+
+      const convoId = typeof convOrId === "string" ? convOrId : convOrId?._id;
+      if (!convoId) {
+        setProfileLoading(false);
+        return;
+      }
+
+      // Get participants (mentor / student ids)
+      const { data: parts } = await api.get(`/chat/${convoId}/participants`);
+      const partnerId = role === "student" ? parts.mentor : parts.student;
+
+      if (!partnerId) {
+        setProfileLoading(false);
+        setProfileData(null);
+        return;
+      }
+
+      if (role === "student") {
+        // student viewing mentor
+        setProfileType("mentor");
+        const { data } = await api.get(`/mentor/mentors/${partnerId}`);
+        setProfileData(data || null);
+      } else {
+        // mentor viewing student
+        setProfileType("student");
+        const { data } = await api.get(`/mentor/students/${partnerId}`);
+        setProfileData(data || null);
+      }
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+      setProfileData(null);
+    } finally {
+      setProfileLoading(false);
+    }
   };
 
   const handleSend = async (e) => {
@@ -183,8 +235,10 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
           <ul className="flex-1 overflow-y-auto space-y-1">
             {conversations.map((c) => (
               <li key={c._id}>
-                <button
+                <div
                   onClick={() => handleSelectConversation(c)}
+                  role="button"
+                  tabIndex={0}
                   className={`w-full text-left rounded-xl px-3 py-2 text-xs ${
                     selectedConvId === c._id
                       ? "bg-sky-500/20 border border-sky-500/60 text-sky-100"
@@ -192,9 +246,16 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">
-                      {c.studentName || c.mentorName}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{c.studentName || c.mentorName}</span>
+                      <button
+                        onClick={(e) => openProfile(c, e)}
+                        className="text-[11px] text-slate-400 hover:text-slate-200"
+                        title="View profile"
+                      >
+                        ℹ️
+                      </button>
+                    </div>
 
                     {c.lastMessageAt && (
                       <span className="text-[10px] text-slate-400">
@@ -207,11 +268,9 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
                   </div>
 
                   {c.lastMessage && (
-                    <p className="mt-0.5 text-[11px] text-slate-400 truncate">
-                      {c.lastMessage}
-                    </p>
+                    <p className="mt-0.5 text-[11px] text-slate-400 truncate">{c.lastMessage}</p>
                   )}
-                </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -224,13 +283,21 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
           <>
             {/* Header */}
             <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Chat</p>
+                  <p className="text-xs font-semibold text-slate-100">{selectedPartner.fullName}</p>
+                </div>
+                <button
+                  onClick={() => openProfile(selectedConvId)}
+                  className="text-[12px] bg-slate-800 px-2 py-1 rounded text-slate-200 hover:bg-slate-700"
+                  title="View profile"
+                >
+                  Profile
+                </button>
+              </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                  Chat
-                </p>
-                <p className="text-xs font-semibold text-slate-100">
-                  {selectedPartner.fullName}
-                </p>
+                {/* Call button is handled elsewhere in app; keep space for it */}
               </div>
             </div>
 
@@ -313,6 +380,23 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
       </div>
 
       {/* TOAST */}
+      {profileType === "mentor" ? (
+        <MentorProfileModal
+          open={profileOpen}
+          loading={profileLoading}
+          profile={profileData}
+          fullName={profileData?.fullName || selectedPartner?.fullName}
+          onClose={() => setProfileOpen(false)}
+        />
+      ) : profileType === "student" ? (
+        <StudentProfileModal
+          open={profileOpen}
+          loading={profileLoading}
+          profile={profileData}
+          onClose={() => setProfileOpen(false)}
+        />
+      ) : null}
+
       <Toast
         message={toast}
         onClose={() => setToast(null)}
