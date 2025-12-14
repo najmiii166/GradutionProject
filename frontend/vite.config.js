@@ -18,13 +18,13 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to backend (running on 5173)
       "/api": {
-        target: "http://localhost:5173",
+        target: "http://localhost:5000",
         changeOrigin: true,
         secure: false,
       },
       // Proxy socket.io websocket to backend
       "/socket.io": {
-        target: "http://localhost:5173",
+        target: "http://localhost:5000  ",
         ws: true,
       },
     },
