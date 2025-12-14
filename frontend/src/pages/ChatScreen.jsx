@@ -15,6 +15,9 @@ import useCall from "../hooks/useCall";
 import CallModal from "../components/CallModal";
 import CallWindow from "../components/CallWindow";
 
+import MentorProfileModal from "../components/mentor/MentorProfileModal";
+import StudentProfileModal from "../components/mentor/StudentProfileModal";
+
 
 
 export default function ChatScreen() {
@@ -73,6 +76,13 @@ useEffect(() => {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [activePartnerName, setActivePartnerName] = useState("");
   const [activePartnerId, setActivePartnerId] = useState(null);
+  const [showMentorModal, setShowMentorModal] = useState(false);
+  const [mentorLoading, setMentorLoading] = useState(false);
+  const [mentorProfile, setMentorProfile] = useState(null);
+
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [studentLoading, setStudentLoading] = useState(false);
+  const [studentProfile, setStudentProfile] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
@@ -506,19 +516,66 @@ function stopRecording() {
 
           {/* HEADER */}
           <div className="p-4 bg-[#0F1A2A] border-b border-[#1E2A3A] shadow-md flex items-center gap-3">
-            <Avatar name={activePartnerName} size={40} />
+            <button
+              className="flex items-center gap-3"
+              onClick={async () => {
+                try {
+                  let partnerId = activePartnerId;
 
-            <div>
-              <p className="font-semibold">{activePartnerName}</p>
-              <p className="text-xs text-slate-400">
-                {theirTyping
-                  ? "Typing…"
-                  : theirStatus === "online"
-                  ? "Online"
-                  : "Offline"}
-              </p>
-              
+                  // If we don't already know the partner id, fetch participants for this conversation
+                  if (!partnerId && activeConversationId) {
+                    const { data: parts } = await api.get(`/chat/${activeConversationId}/participants`);
+                    // parts = { mentor: string, student: string }
+                    partnerId = role === "student" ? parts.mentor : parts.student;
+                    // store for later convenience
+                    if (partnerId) setActivePartnerId(partnerId);
+                  }
+
+                  if (!partnerId) {
+                    setToast("Could not determine conversation partner");
+                    return;
+                  }
+
+                    if (role === "student") {
+                      setShowMentorModal(true);
+                      setMentorLoading(true);
+                      setMentorProfile(null);
+                      const { data } = await api.get(`/mentor/mentors/${partnerId}`);
+                      setMentorProfile(data || null);
+                    } else {
+                      setShowStudentModal(true);
+                      setStudentLoading(true);
+                      setStudentProfile(null);
+                      const { data } = await api.get(`/mentor/students/${partnerId}`);
+                      setStudentProfile(data || null);
+                    }
+                } catch (err) {
+                  // handle auth error specifically
+                  if (err?.response?.status === 401) {
+                    setToast("Fadlan gal (login) si aad u aragto profile-ka");
+                    navigate("/login");
+                  } else {
+                    setToast("Failed to load profile");
+                  }
+                } finally {
+                  setMentorLoading(false);
+                  setStudentLoading(false);
+                }
+              }}
+            >
+              <Avatar name={activePartnerName} size={40} />
+
+              <div>
+                <p className="font-semibold">{activePartnerName}</p>
+                <p className="text-xs text-slate-400">
+                  {theirTyping
+                    ? "Typing…"
+                    : theirStatus === "online"
+                    ? "Online"
+                    : "Offline"}
+                </p>
               </div>
+            </button>
 
               <button
   onClick={() => {
@@ -826,6 +883,21 @@ function stopRecording() {
           Select a conversation
         </div>
       )}
+
+            <MentorProfileModal
+              open={showMentorModal}
+              loading={mentorLoading}
+              profile={mentorProfile}
+              fullName={mentorProfile?.fullName || activePartnerName}
+              onClose={() => setShowMentorModal(false)}
+            />
+
+            <StudentProfileModal
+              open={showStudentModal}
+              loading={studentLoading}
+              profile={studentProfile}
+              onClose={() => setShowStudentModal(false)}
+            />
 
             <Toast message={toast} onClose={() => setToast(null)} />
 

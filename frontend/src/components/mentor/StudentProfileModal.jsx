@@ -46,11 +46,11 @@ export default function StudentProfileModal({
 
             <h2 className="text-xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-2">
               <User className="w-5 h-5 text-sky-400" />
-              {profile?.fullName || "Student"}
+              {profile?.user?.fullName || profile?.fullName || "Student"}
             </h2>
 
             <p className="text-xs text-slate-400 mt-1">
-              {profile?.email || ""}
+              {profile?.user?.email || profile?.email || ""}
             </p>
           </div>
 

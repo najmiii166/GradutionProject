@@ -45,6 +45,18 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
         yearsOfExperience: m.yearsOfExperience ?? 0, // ✅ ensure it always exists
         expertiseAreas: m.expertiseAreas,
         availability: m.availability || [],
+        // rating metadata
+        averageRating: m.averageRating || 0,
+        totalRatings: m.totalRatings || 0,
+        percentPositive: (() => {
+          try {
+            const arr = m.ratings || [];
+            if (!arr.length) return 0;
+            const ok = arr.filter((r) => (r.score || 0) >= 4).length;
+            return Math.round((ok / arr.length) * 100);
+          } catch (e) { return 0; }
+        })(),
+        badge: m.averageRating ? (m.badge || "—") : "—",
       }));
 
     res.json({ mentorshipAreas, mentors });
