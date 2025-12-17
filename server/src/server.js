@@ -82,7 +82,8 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-
+// Expose io on the express app so routes can emit events: req.app.get('io')
+app.set("io", io);
 io.use(socketAuth);
 
 /* =====================================================
