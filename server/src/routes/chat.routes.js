@@ -18,8 +18,23 @@ router.post("/open", auth, async (req, res) => {
 
   let convo = await Conversation.findOne({ mentor: mentorId, student: studentId });
 
+  let created = false;
   if (!convo) {
     convo = await Conversation.create({ mentor: mentorId, student: studentId });
+    created = true;
+  }
+
+  // If we created a new conversation, notify both participants in real-time
+  if (created) {
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(String(mentorId)).emit("conversation:created", convo);
+        io.to(String(studentId)).emit("conversation:created", convo);
+      }
+    } catch (err) {
+      console.error("Socket emit error (conversation:created):", err);
+    }
   }
 
   res.json(convo);
