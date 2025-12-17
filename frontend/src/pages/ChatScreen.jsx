@@ -143,31 +143,10 @@ export default function ChatScreen() {
         setConversations(convos);
 
         if (routeConversationId) {
-          const exists = convos.some((c) => String(c._id) === String(routeConversationId));
-          if (exists) {
-            setActiveConversationId(routeConversationId);
-          } else {
-            // convo not present in list (maybe just created). Fetch participants and resolve partner name/id
-            try {
-              const { data: parts } = await api.get(`/chat/${routeConversationId}/participants`);
-              const partnerId = role === "student" ? parts.mentor : parts.student;
-              if (partnerId) {
-                setActiveConversationId(routeConversationId);
-                setActivePartnerId(partnerId);
-
-                // fetch partner profile to show name
-                if (role === "student") {
-                  const { data: mentor } = await api.get(`/mentor/mentors/${partnerId}`);
-                  setActivePartnerName(mentor?.fullName || "");
-                } else {
-                  const { data: student } = await api.get(`/mentor/students/${partnerId}`);
-                  setActivePartnerName(student?.fullName || "");
-                }
-              }
-            } catch (err) {
-              console.error("Failed to resolve conversation participant for route id:", err);
-            }
-          }
+          const exists = data.some(
+            (c) => String(c._id) === String(routeConversationId)
+          );
+          if (exists) setActiveConversationId(routeConversationId);
         }
       } catch {
         setToast("Failed to load conversations");
