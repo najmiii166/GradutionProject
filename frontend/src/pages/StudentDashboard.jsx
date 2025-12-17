@@ -376,24 +376,39 @@ export default function StudentDashboard() {
                     >
                       {r.status}
                     </p>
-                   {r.status === "upcoming" && (
-  <button
-    onClick={async () => {
-      const studentId = user._id || user.id;
-      const mentorId = r.mentorId?._id;
+                    {r.status === "upcoming" && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const studentId = user._id || user.id;
+                            const mentorId = r.mentorId?._id;
 
-      const { data } = await api.post("/chat/open", {
-        mentorId,
-        studentId
-      });
+                            if (!mentorId || !studentId) {
+                              setToast("Could not open chat: missing participant id");
+                              return;
+                            }
 
-      navigate(`/chat/${data._id}`);
-    }}
-    className="mt-2 flex items-center gap-1 text-[12px] text-emerald-400 hover:text-emerald-200 transition"
-  >
-    <MessageCircle className="w-4 h-4" /> Chat
-  </button>
-)}
+                            const { data } = await api.post("/chat/open", {
+                              mentorId,
+                              studentId,
+                            });
+
+                            if (!data || !data._id) {
+                              setToast("Failed to open conversation");
+                              return;
+                            }
+
+                            navigate(`/chat/${data._id}`);
+                          } catch (err) {
+                            console.error("Open chat error:", err);
+                            setToast(err?.response?.data?.message || "Failed to open chat");
+                          }
+                        }}
+                        className="mt-2 flex items-center gap-1 text-[12px] text-emerald-400 hover:text-emerald-200 transition"
+                      >
+                        <MessageCircle className="w-4 h-4" /> Chat
+                      </button>
+                    )}
 
 
 
