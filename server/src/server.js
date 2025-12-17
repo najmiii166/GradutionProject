@@ -36,6 +36,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
+  "https://gradution-project-jixjwsqsm-najmiii166s-projects.vercel.app",
   "https://gradution-project-eight.vercel.app",
 ];
 
