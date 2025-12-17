@@ -7,24 +7,25 @@ export const ensureAdminExists = async () => {
     const email = process.env.ADMIN_EMAIL || "admin@mentorlink.io";
     const password = process.env.ADMIN_PASSWORD || "Admin123!";
     const fullName = "System Admin";
-
-    const admin = await User.findOne({ role: "admin" });
-    if (admin) {
-      console.log("✅ Admin user already exists.");
-      return;
-    }
-
+    // Always ensure admin exists and has the configured password.
+    // Use findOneAndUpdate with upsert so we can both create and update the admin user.
     const passwordHash = await bcrypt.hash(password, 12);
 
-    await User.create({
+    const update = {
       fullName,
       email,
       passwordHash,
       role: "admin",
       status: "verified",
+    };
+
+    await User.findOneAndUpdate({ role: "admin" }, update, {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
     });
 
-    console.log("🌱 Admin user seeded successfully!");
+    console.log(`🌱 Admin ensured: ${email}`);
   } catch (err) {
     console.error("❌ Error ensuring admin user exists:", err);
   }
