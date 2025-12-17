@@ -20,12 +20,9 @@ import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
 import socketAuth from "./middleware/socketAuth.js";
+import { ensureAdminExists } from "./seed/seedAdmin.js";
 
 import httpProxy from "http-proxy";
-import { URL } from "url";
-
-import Message from "./models/Message.js";
-import Conversation from "./models/Conversation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -185,6 +182,7 @@ const port = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
+    ensureAdminExists(); // <-- Check for and create admin user if needed
     server.listen(port, () =>
       console.log(`🚀 Server Ready → http://localhost:${port}`)
     );
