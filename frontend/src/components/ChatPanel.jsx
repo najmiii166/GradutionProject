@@ -139,12 +139,27 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
   }, [messages]);
 
   const handleSelectConversation = (conv) => {
-    const partnerName = conv.studentName || conv.mentorName || "User";
+    (async () => {
+      try {
+        setSelectedConvId(conv._id);
 
-    // set conversation selected (messages) — we'll lazily resolve the partner id when needed
-    setSelectedPartner({ _id: conv._id, fullName: partnerName });
-    setSelectedConvId(conv._id);
-    loadMessages(conv._id);
+        // Resolve participant ids/names from server to avoid relying on possibly incomplete convo objects
+        const { data: parts } = await api.get(`/chat/${conv._id}/participants`);
+
+        const partnerId = role === "student" ? parts.mentor : parts.student;
+        const partnerName = conv.studentName || conv.mentorName || "User";
+
+        setSelectedPartner({ _id: partnerId, fullName: partnerName });
+        loadMessages(conv._id);
+      } catch (err) {
+        console.error("Failed to select conversation:", err);
+        // Fallback to previous behavior
+        const partnerName = conv.studentName || conv.mentorName || "User";
+        setSelectedPartner({ _id: conv._id, fullName: partnerName });
+        setSelectedConvId(conv._id);
+        loadMessages(conv._id);
+      }
+    })();
   };
 
   // Profile modal state
