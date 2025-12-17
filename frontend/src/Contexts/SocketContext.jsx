@@ -7,6 +7,7 @@ export const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const s = createSocket();

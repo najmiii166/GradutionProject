@@ -18,8 +18,8 @@ import { SocketProvider } from "./Contexts/SocketContext";
 
 export default function App() {
   return (
-    <SocketProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <SocketProvider>
         <Routes>
           {/* Public */}
           <Route path="/" element={<Landing />} />
@@ -44,7 +44,7 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
-      </BrowserRouter>
-    </SocketProvider>
+      </SocketProvider>
+    </BrowserRouter>
   );
 }
