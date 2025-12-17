@@ -32,36 +32,10 @@ export default function ChatScreen() {
   setAuthToken(token);
 
   const socket = useContext(SocketContext);
-
-  const {
-    incomingCall,
-    inCall,
-    startCall,
-    acceptCall,
-    rejectCall,
-    endCall,
-    remoteAudioRef,
-    callStatus,
-    setCallStatus
-  } = useCall(socket, user, activePartnerId, activeConversationId);
+  
 
 
-// CALL DURATION TIMER
-
-const [callDuration, setCallDuration] = useState(0);
-const callTimerRef = useRef(null);
-
-// call  TIMER
-useEffect(() => {
-  if (callStatus === "connected" && inCall) {
-    callTimerRef.current = setInterval(() => {
-      setCallDuration(prev => prev + 1);
-    }, 1000);
-  } else {
-    clearInterval(callTimerRef.current);
-    setCallDuration(0);
-  }
-}, [callStatus, inCall]);
+// CALL DURATION TIMER will be initialized after call hook below
 
 
 
@@ -128,6 +102,36 @@ useEffect(() => {
   //   serverConversationId: activeConversationId,
   //   partnerId: activePartnerId,
   // });
+
+  // Initialize the call hook after the partner/conversation state exists
+  const {
+    incomingCall,
+    inCall,
+    startCall,
+    acceptCall,
+    rejectCall,
+    endCall,
+    remoteAudioRef,
+    callStatus,
+    setCallStatus,
+  } = useCall(socket, user, activePartnerId, activeConversationId);
+
+  // CALL DURATION TIMER
+  const [callDuration, setCallDuration] = useState(0);
+  const callTimerRef = useRef(null);
+
+  // call TIMER: start/stop based on callStatus and inCall
+  useEffect(() => {
+    if (callStatus === "connected" && inCall) {
+      callTimerRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(callTimerRef.current);
+      setCallDuration(0);
+    }
+    return () => clearInterval(callTimerRef.current);
+  }, [callStatus, inCall]);
 
   // -----------------------------------------
   // LOAD CONVERSATIONS
