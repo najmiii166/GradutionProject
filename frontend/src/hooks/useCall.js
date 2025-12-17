@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function useCall(socket, user) {
+export default function useCall(socket, user, partnerId, conversationId) {
   const [incomingCall, setIncomingCall] = useState(null);
   const [inCall, setInCall] = useState(false);
   const [callStatus, setCallStatus] = useState(null); // calling | ringing | connected
@@ -8,14 +8,13 @@ export default function useCall(socket, user) {
   const peerRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const localStreamRef = useRef(null);
-  const targetIdRef = useRef(null);
 
   // ------------------------
   // START CALL
   // ------------------------
-  async function startCall(targetId) {
-    targetIdRef.current = targetId;
+  async function startCall() {
     setCallStatus("calling");
+    if (!partnerId || !conversationId) return;
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -24,7 +23,7 @@ export default function useCall(socket, user) {
 
     localStreamRef.current = stream;
 
-    const pc = createPeer(targetId);
+    const pc = createPeer(partnerId);
     peerRef.current = pc;
 
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
@@ -32,12 +31,7 @@ export default function useCall(socket, user) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    socket.emit("call:offer", {
-      fromId: user._id,
-      fromName: user.fullName,
-      targetId,
-      offer,
-    });
+    socket.emit("call:start", { targetId: partnerId, offer, conversationId });
   }
 
   // ------------------------
@@ -45,8 +39,6 @@ export default function useCall(socket, user) {
   // ------------------------
   async function acceptCall() {
     const { fromId, offer } = incomingCall;
-
-    targetIdRef.current = fromId;
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -65,7 +57,7 @@ export default function useCall(socket, user) {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    socket.emit("call:answer", { targetId: fromId, answer });
+    socket.emit("call:accept", { targetId: fromId, answer });
 
     setIncomingCall(null);
     setCallStatus("connected");
@@ -121,9 +113,7 @@ export default function useCall(socket, user) {
     setInCall(false);
     setCallStatus(null);
 
-    if (targetIdRef.current) {
-      socket.emit("call:end", { targetId: targetIdRef.current });
-    }
+    if (partnerId) socket.emit("call:end", { targetId: partnerId });
   }
 
   // ------------------------
@@ -132,40 +122,40 @@ export default function useCall(socket, user) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("call:incoming", ({ fromId, fromName, offer }) => {
-      setIncomingCall({ fromId, fromName, offer });
-    });
-
-    socket.on("call:ringing", () => {
-      setCallStatus("ringing");
-    });
-
-    socket.on("call:accepted", () => {
+    const handleIncoming = ({ fromId, offer }) => {
+      setIncomingCall({ fromId, offer });
+    };
+    const handleRinging = () => setCallStatus("ringing");
+    const handlePartnerOffline = () => setCallStatus("offline"); // Partner is offline
+    const handleAccepted = async ({ answer }) => {
+      await peerRef.current?.setRemoteDescription(answer);
       setCallStatus("connected");
       setInCall(true);
-    });
-
-    socket.on("call:answer", async ({ answer }) => {
-      await peerRef.current?.setRemoteDescription(answer);
-    });
-
-    socket.on("call:ice-candidate", ({ candidate }) => {
+    };
+    const handleIceCandidate = ({ candidate }) => {
       peerRef.current?.addIceCandidate(candidate);
-    });
+    };
+    const handleRejected = () => endCall();
+    const handleEnded = () => endCall();
 
-    socket.on("call:rejected", () => endCall());
-    socket.on("call:ended", () => endCall());
+    socket.on("call:incoming", handleIncoming); // Receiver gets this
+    socket.on("call:ringing", handleRinging);
+    socket.on("call:partner-offline", handlePartnerOffline);
+    socket.on("call:accepted", handleAccepted);
+    socket.on("call:ice-candidate", handleIceCandidate);
+    socket.on("call:rejected", handleRejected);
+    socket.on("call:ended", handleEnded);
 
     return () => {
-      socket.off("call:incoming");
-      socket.off("call:ringing");
-      socket.off("call:accepted");
-      socket.off("call:answer");
-      socket.off("call:ice-candidate");
-      socket.off("call:rejected");
-      socket.off("call:ended");
+      socket.off("call:incoming", handleIncoming);
+      socket.off("call:ringing", handleRinging);
+      socket.off("call:partner-offline", handlePartnerOffline);
+      socket.off("call:accepted", handleAccepted);
+      socket.off("call:ice-candidate", handleIceCandidate);
+      socket.off("call:rejected", handleRejected);
+      socket.off("call:ended", handleEnded);
     };
-  }, []);
+  }, [socket, partnerId, conversationId]);
 
   return {
     incomingCall,
