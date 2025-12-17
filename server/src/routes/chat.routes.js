@@ -22,6 +22,10 @@ router.post("/open", auth, async (req, res) => {
   if (!convo) {
     convo = await Conversation.create({ mentor: mentorId, student: studentId });
     created = true;
+    // populate mentor/student names for immediate client use
+    convo = await Conversation.findById(convo._id)
+      .populate("mentor", "fullName")
+      .populate("student", "fullName");
   }
 
   // If we created a new conversation, notify both participants in real-time
