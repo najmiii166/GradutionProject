@@ -20,7 +20,10 @@ export default function ChatIndex() {
     try {
       const url = role === "student" ? "/chat/student" : "/chat/mentor";
       const { data } = await api.get(url);
-      setConversations(data || []);
+      const convos = (data || []).filter(
+        (c) => (c.studentName && String(c.studentName).trim() !== "") || (c.mentorName && String(c.mentorName).trim() !== "")
+      );
+      setConversations(convos);
     } catch (err) {
       console.error("Chat list error:", err);
     } finally {
