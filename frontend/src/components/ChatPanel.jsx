@@ -31,7 +31,11 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
     try {
       setLoadingConversations(true);
       const { data } = await api.get(listUrl);
-      setConversations(data || []);
+      // Filter out invalid conversations that lack participant display names
+      const convos = (data || []).filter(
+        (c) => (c.studentName && String(c.studentName).trim() !== "") || (c.mentorName && String(c.mentorName).trim() !== "")
+      );
+      setConversations(convos);
     } catch (err) {
       console.error("Conversations error:", err);
       setToast("Failed to load conversations.");
