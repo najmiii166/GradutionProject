@@ -32,10 +32,9 @@ export default function ChatScreen() {
   setAuthToken(token);
 
   const socket = useContext(SocketContext);
-  
 
 
-// CALL DURATION TIMER will be initialized after call hook below
+
 
 
 
@@ -96,14 +95,7 @@ export default function ChatScreen() {
   // -----------------------------------------
   // CALL HOOK (temporarily disabled)
   // -----------------------------------------
-  // const call = useCall({
-  //   socket,
-  //   user,
-  //   serverConversationId: activeConversationId,
-  //   partnerId: activePartnerId,
-  // });
-
-  // Initialize the call hook after the partner/conversation state exists
+  // Initialize call hook with the current partner and conversation
   const {
     incomingCall,
     inCall,
@@ -120,17 +112,18 @@ export default function ChatScreen() {
   const [callDuration, setCallDuration] = useState(0);
   const callTimerRef = useRef(null);
 
-  // call TIMER: start/stop based on callStatus and inCall
   useEffect(() => {
     if (callStatus === "connected" && inCall) {
       callTimerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
     } else {
-      clearInterval(callTimerRef.current);
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
       setCallDuration(0);
     }
-    return () => clearInterval(callTimerRef.current);
+    return () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+    };
   }, [callStatus, inCall]);
 
   // -----------------------------------------
