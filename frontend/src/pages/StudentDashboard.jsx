@@ -381,15 +381,16 @@ export default function StudentDashboard() {
                         onClick={async () => {
                           try {
                             const studentId = user._id || user.id;
-                            const mentorId = r.mentorId?._id;
+                            // `r.mentorId` is a MentorProfile populated with `user` — we must pass the User _id
+                            const mentorUserId = r.mentorId?.user?._id || r.mentorId?._id;
 
-                            if (!mentorId || !studentId) {
+                            if (!mentorUserId || !studentId) {
                               setToast("Could not open chat: missing participant id");
                               return;
                             }
 
                             const { data } = await api.post("/chat/open", {
-                              mentorId,
+                              mentorId: mentorUserId,
                               studentId,
                             });
 
@@ -398,6 +399,7 @@ export default function StudentDashboard() {
                               return;
                             }
 
+                            // Navigate to the conversation and trust the server to populate partner info
                             navigate(`/chat/${data._id}`);
                           } catch (err) {
                             console.error("Open chat error:", err);
