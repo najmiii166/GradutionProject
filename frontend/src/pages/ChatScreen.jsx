@@ -34,16 +34,16 @@ export default function ChatScreen() {
   const socket = useContext(SocketContext);
 
   const {
-  incomingCall,
-  inCall,
-  startCall,
-  acceptCall,
-  rejectCall,
-  endCall,
-  remoteAudioRef,
-  callStatus,
-  setCallStatus
-} = useCall(socket, user);
+    incomingCall,
+    inCall,
+    startCall,
+    acceptCall,
+    rejectCall,
+    endCall,
+    remoteAudioRef,
+    callStatus,
+    setCallStatus
+  } = useCall(socket, user, activePartnerId, activeConversationId);
 
 
 // CALL DURATION TIMER
@@ -204,16 +204,24 @@ useEffect(() => {
   useEffect(() => {
     if (!socket || !activeConversationId) return;
 
+    // --- Presence: Announce online status and listen for partner's status ---
+    if (user._id) {
+      socket.emit("user_online", user._id);
+      socket.emit("get_user_status", activePartnerId); // Ask for partner's status on convo switch
+    }
+
     socket.emit("join_conversation", { conversationId: activeConversationId });
 
     socket.on("new_message", (msg) => {
-      if (String(msg.conversationId) !== String(activeConversationId)) return;
-      setMessages((prev) => {
-        if (prev.some((m) => String(m._id) === String(msg._id))) return prev;
-        return [...prev, msg];
-      });
-
-      if (msg.sender !== user._id) {
+      // This logic needs to check against the *current* active conversation ID inside the state updater
+      // to avoid issues with stale closures.
+      setMessages((prevMessages) => {
+        if (String(msg.conversationId) === String(activeConversationId)) {
+          if (prevMessages.some((m) => String(m._id) === String(msg._id))) return prevMessages;
+          return [...prevMessages, msg];
+        }
+        return prevMessages;
+      });      if (msg.sender !== user._id && String(msg.conversationId) === String(activeConversationId)) {
         socket.emit("seen", {
           conversationId: activeConversationId,
           messageId: msg._id,
@@ -236,7 +244,9 @@ useEffect(() => {
     });
 
     socket.on("user_status", (data) => {
-      if (data.userId === activePartnerId) setTheirStatus(data.status);
+      if (String(data.userId) === String(activePartnerId)) {
+        setTheirStatus(data.status);
+      }
     });
 
     socket.on("message:updated", (msg) => {
@@ -575,16 +585,11 @@ function stopRecording() {
             </button>
 
             <button
-  onClick={() => {
-    // UI updates instantly
-    setCallStatus(theirStatus === "online" ? "ringing" : "calling");
-
-    startCall(activePartnerId);
-  }}
-  className="ml-auto px-4 py-2 bg-[#0EA5E9] hover:bg-[#0284C7] rounded shadow text-white"
->
-  📞 Voice Call
-</button>
+              onClick={startCall}
+              className="ml-auto px-4 py-2 bg-[#0EA5E9] hover:bg-[#0284C7] rounded shadow text-white"
+            >
+              📞 Voice Call
+            </button>
 
 
 
@@ -627,6 +632,10 @@ function stopRecording() {
                         isMe
                           ? "bg-[#0EA5E9] text-white"
                           : "bg-[#1E2A3A] text-slate-200"
+                      } ${
+                        m.type === "missed-call"
+                          ? "bg-red-900/50 border border-red-700/60"
+                          : ""
                       } ${
                         highlightedMessageId === m._id
                           ? "ring-2 ring-blue-500"
@@ -898,7 +907,7 @@ function stopRecording() {
 {incomingCall && (
   <CallModal
     incoming={true}
-    name={incomingCall.fromName}
+    name={activePartnerName} // We know the name from the active chat
     onAccept={acceptCall}
     onReject={rejectCall}
   />
@@ -909,7 +918,7 @@ function stopRecording() {
   <CallModal
     incoming={false}
     name={activePartnerName}
-    status={callStatus} 
+    status={callStatus}
     onReject={() => {
       endCall();
     }}
