@@ -21,8 +21,10 @@ const idStorage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const ok = ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
-  cb(ok ? null : new Error("Only JPG/PNG/WEBP allowed"), ok);
+  // Allow common image types plus SVG for ID cards (SVG used by some uploads)
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+  const ok = allowed.includes(file.mimetype);
+  cb(ok ? null : new Error("Only JPG/PNG/WEBP/SVG allowed"), ok);
 };
 
 export const uploadIdCard = multer({
