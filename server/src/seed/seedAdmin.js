@@ -8,7 +8,8 @@ export const ensureAdminExists = async () => {
     const password = process.env.ADMIN_PASSWORD || "Admin123!";
     const fullName = "System Admin";
     // Always ensure admin exists and has the configured password.
-    // Use findOneAndUpdate with upsert so we can both create and update the admin user.
+    // Use the email as the upsert filter to avoid duplicate key errors when an admin
+    // was previously created with the same email but different role value.
     const passwordHash = await bcrypt.hash(password, 12);
 
     const update = {
@@ -19,7 +20,10 @@ export const ensureAdminExists = async () => {
       status: "verified",
     };
 
-    await User.findOneAndUpdate({ role: "admin" }, update, {
+    // Upsert by email (idempotent). If another document with the same email exists
+    // but different role, this will update that document to be the admin instead
+    // of trying to insert and triggering a duplicate-key error on the email index.
+    await User.findOneAndUpdate({ email }, update, {
       upsert: true,
       new: true,
       setDefaultsOnInsert: true,

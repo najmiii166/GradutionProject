@@ -113,6 +113,7 @@ router.post(
       email,
       password,
       university,
+      faculty,
       major,
       semester,
       mentorshipAreas,
@@ -133,16 +134,28 @@ router.post(
 
     const idCardUrl = `/uploads/idcards/${req.file.filename}`;
 
-    const mentorshipAreasArray = mentorshipAreas
-      ? String(mentorshipAreas)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
+    let mentorshipAreasArray = [];
+    if (mentorshipAreas) {
+      if (Array.isArray(mentorshipAreas)) {
+        mentorshipAreasArray = mentorshipAreas.map((s) => String(s).trim()).filter(Boolean);
+      } else if (typeof mentorshipAreas === 'string') {
+        // frontend may send JSON stringified array
+        try {
+          const parsed = JSON.parse(mentorshipAreas);
+          if (Array.isArray(parsed)) mentorshipAreasArray = parsed.map((s) => String(s).trim()).filter(Boolean);
+          else {
+            mentorshipAreasArray = String(mentorshipAreas).split(',').map((s) => s.trim()).filter(Boolean);
+          }
+        } catch (err) {
+          mentorshipAreasArray = String(mentorshipAreas).split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+    }
 
     await StudentProfile.create({
       user: user._id,
-      major,
+      faculty: faculty || null,
+      major: major || null,
       semester,
       idCardUrl,
       mentorshipAreas: mentorshipAreasArray,

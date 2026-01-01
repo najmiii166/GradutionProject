@@ -31,6 +31,16 @@ export function SocketProvider({ children }) {
       }
     });
 
+    // Generic notifications (requests, chat, accept/reject, etc.)
+    s.on("notification", (payload) => {
+      try {
+        // Dispatch a DOM event so pages can subscribe without coupling to socket
+        window.dispatchEvent(new CustomEvent("socket:notification", { detail: payload }));
+      } catch (e) {
+        console.error("Failed to dispatch socket:notification event:", e);
+      }
+    });
+
     return () => {
       try {
         s.disconnect();

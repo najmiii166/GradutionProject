@@ -2,8 +2,9 @@
 import { io } from "socket.io-client";
 import { API_URL } from "./api/axios";
 
-// Convert "http://localhost:5000/api" → "http://localhost:5000"
-const SOCKET_URL = API_URL.replace(/\/api$/, "");
+// Convert API URL like "http://host:port/api" or with trailing slash
+// into socket base URL (strip trailing `/api` or `/api/`)
+const SOCKET_URL = API_URL.replace(/\/api\/?$/i, "");
 
 export function createSocket() {
   const token = localStorage.getItem("token");

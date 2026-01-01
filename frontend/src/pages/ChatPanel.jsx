@@ -1,9 +1,9 @@
 // src/components/ChatPanel.jsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useContext } from "react";
 import { api } from "../api/axios";
 import Spinner from "./Spinner";
 import Toast from "./Toast";
-import { createSocket } from "../socket";
+import SocketContext from "../Contexts/SocketContext";
 
 export default function ChatPanel({ currentUserId, initialTarget }) {
   const role = localStorage.getItem("role");
@@ -55,14 +55,10 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
     loadConversations();
   }, []);
 
+  const socket = useContext(SocketContext);
   useEffect(() => {
-    const s = createSocket();
-    socketRef.current = s;
-    return () => {
-      s.disconnect();
-      socketRef.current = null;
-    };
-  }, []);
+    socketRef.current = socket;
+  }, [socket]);
 
   // if initialTarget given (likely { id, name }), open/create conversation
   useEffect(() => {
@@ -92,7 +88,10 @@ export default function ChatPanel({ currentUserId, initialTarget }) {
 
     const handleNewMessage = (msg) => {
       if (String(msg.conversationId) === String(selectedConvId)) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => {
+          if (prev.some((m) => String(m._id) === String(msg._id))) return prev;
+          return [...prev, msg];
+        });
       }
       // update conversation preview
       setConversations((prev) =>

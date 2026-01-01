@@ -6,7 +6,7 @@ export const mentorRegisterRules = [
   body("password").isStrongPassword({ minLength: 8 }),
   body("institution").notEmpty(),
   body("faculty").notEmpty(),
-  body("department").notEmpty(),
+  body("department").optional(),
   body("yearsOfExperience").isInt({ min: 0 }),
   body("bio").optional().isLength({ max: 1000 }),
   body("expertiseAreas").optional().isArray(),
@@ -18,7 +18,8 @@ export const studentRegisterRules = [
   body("email").isEmail(),
   body("password").isStrongPassword({ minLength: 8 }),
   body("university").notEmpty(),
-  body("major").notEmpty(),
+  // Frontend now sends `faculty` (key) instead of free-text `major`
+  body("faculty").notEmpty(),
   body("semester").notEmpty(),
   // NEW: mentorship areas (comma separated string from frontend)
   body("mentorshipAreas").optional().isString(),
