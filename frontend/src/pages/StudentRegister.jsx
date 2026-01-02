@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/axios";
+import { universities, faculties } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Select from "../components/Select";
 import Button from "../components/Button";
@@ -18,15 +19,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-const majors = [
-  "Computer Science",
-  "Engineering",
-  "Business",
-  "Medicine",
-  "Agriculture",
-  "Law",
-  "Arts",
-].map((m) => ({ value: m, label: m }));
+// majors removed in favor of structured `faculties` from systemData
 
 export default function StudentRegister() {
   const [form, setForm] = useState({
@@ -43,14 +36,39 @@ export default function StudentRegister() {
   const [toast, setToast] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
+  const [selectedUniKey, setSelectedUniKey] = useState(null);
+  const [selectedFacultyKey, setSelectedFacultyKey] = useState(null);
+  const [selectedLearningGoals, setSelectedLearningGoals] = useState([]);
 
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const onUniversitySelect = (e) => {
+    const key = e.target.value;
+    setSelectedUniKey(key || null);
+  };
+
+  const onFacultySelect = (e) => {
+    const key = e.target.value || null;
+    setSelectedFacultyKey(key);
+    setSelectedLearningGoals([]);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
 
+    // require university and faculty to be chosen from list
+    if (!selectedUniKey) return setToast('Please select a university from the list');
+    if (!selectedFacultyKey) return setToast('Please select a Faculty');
+
     const data = new FormData();
-    Object.entries(form).forEach(([k, v]) => data.append(k, v));
+    data.append('fullName', form.fullName);
+    data.append('email', form.email);
+    data.append('password', form.password);
+    data.append('university', String(selectedUniKey));
+    data.append('faculty', selectedFacultyKey || '');
+    data.append('semester', form.semester || '');
+    // send learning goals as JSON string of keys
+    data.append('mentorshipAreas', JSON.stringify(selectedLearningGoals || []));
     if (idFile) data.append("idCard", idFile);
 
     setLoading(true);
@@ -68,6 +86,9 @@ export default function StudentRegister() {
         mentorshipAreas: "",
       });
       setIdFile(null);
+      setSelectedUniKey(null);
+      setSelectedFacultyKey(null);
+      setSelectedLearningGoals([]);
     } catch (err) {
       const msg =
         err.response?.data?.message ||
@@ -168,34 +189,65 @@ export default function StudentRegister() {
               {/* University */}
               <div className="relative">
                 <Building2 className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="university"
-                  placeholder="University"
-                  value={form.university}
-                  onChange={update}
-                  required
-                  className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all"
-                />
-              </div>
-
-              {/* Major */}
-              <div className="relative">
-                <BookOpen className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                 <select
-                  name="major"
-                  value={form.major}
-                  onChange={update}
+                  name="university"
+                  value={selectedUniKey || ""}
+                  onChange={onUniversitySelect}
                   required
                   className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all"
                 >
-                  <option value="">Select Major</option>
-                  {majors.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
+                  <option value="">Select University</option>
+                  {universities.map((u) => (
+                    <option key={u.key} value={u.key}>
+                      {u.name}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Faculty */}
+              <div className="relative">
+                <BookOpen className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                <select
+                  name="faculty"
+                  value={selectedFacultyKey || ""}
+                  onChange={onFacultySelect}
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all"
+                >
+                  <option value="">Select Faculty</option>
+                  {faculties.map((f) => (
+                    <option key={f.key} value={f.key}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Learning Goals (checkboxes based on selected faculty) */}
+              <div className="relative">
+                {selectedFacultyKey ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">Learning Goals</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
+                        <label key={sub.key} className="flex items-center gap-2 px-3 py-2 bg-white/70 rounded text-sm text-gray-800">
+                          <input
+                            type="checkbox"
+                            checked={selectedLearningGoals.includes(sub.key)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedLearningGoals((s) => [...s, sub.key]);
+                              else setSelectedLearningGoals((s) => s.filter(x => x !== sub.key));
+                            }}
+                          />
+                          <span>{sub.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Choose a Faculty to show learning goals</p>
+                )}
               </div>
 
               {/* Semester */}
@@ -212,18 +264,7 @@ export default function StudentRegister() {
                 />
               </div>
 
-              {/* Mentorship Areas */}
-              <div className="relative">
-                <ClipboardList className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="mentorshipAreas"
-                  placeholder="Mentorship areas (comma separated)"
-                  value={form.mentorshipAreas}
-                  onChange={update}
-                  className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all"
-                />
-              </div>
+              {/* old free-text mentorship input removed; learning goals above are used instead */}
 
               {/* File upload */}
               <FileDrop label="Student ID Card" onFile={setIdFile} />

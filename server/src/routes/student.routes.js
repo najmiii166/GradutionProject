@@ -66,4 +66,55 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
   }
 });
 
+/* =======================================================
+   UPDATE STUDENT PROFILE (post-approval)
+   Allows a verified student to complete or edit their profile
+   PUT /api/student/profile
+   body (json): { faculty, major, semester, mentorshipAreas, about, idCardUrl }
+======================================================= */
+router.put("/profile", auth, requireRole("student"), async (req, res) => {
+  try {
+    // Only allow profile edits after admin verification
+    if (req.user.status !== "verified") {
+      return res.status(403).json({ message: "Profile completion allowed only after verification." });
+    }
+
+    const { faculty, major, semester, mentorshipAreas, about, idCardUrl } = req.body;
+
+    // normalize mentorshipAreas: accept array, JSON-string, or CSV
+    let areas = [];
+    if (Array.isArray(mentorshipAreas)) {
+      areas = mentorshipAreas.map((a) => String(a || "").trim()).filter(Boolean);
+    } else if (typeof mentorshipAreas === "string") {
+      try {
+        areas = JSON.parse(mentorshipAreas);
+        if (!Array.isArray(areas)) areas = [];
+        areas = areas.map((a) => String(a || "").trim()).filter(Boolean);
+      } catch (e) {
+        areas = String(mentorshipAreas || "").split(",").map((a) => a.trim()).filter(Boolean);
+      }
+    }
+
+    const update = {
+      ...(faculty ? { faculty } : {}),
+      ...(major ? { major } : {}),
+      ...(semester ? { semester } : {}),
+      ...(about ? { about } : {}),
+      ...(idCardUrl ? { idCardUrl } : {}),
+    };
+    if (areas.length) update.mentorshipAreas = areas;
+
+    const profile = await StudentProfile.findOneAndUpdate(
+      { user: req.user.id },
+      { $set: update },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    return res.json({ message: "Profile updated", profile });
+  } catch (err) {
+    console.error("Failed to update student profile:", err);
+    return res.status(500).json({ message: "Failed to update profile" });
+  }
+});
+
 export default router;

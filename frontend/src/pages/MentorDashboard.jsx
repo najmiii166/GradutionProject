@@ -1,5 +1,5 @@
 // src/pages/MentorDashboard.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { api, setAuthToken } from "../api/axios";
@@ -29,6 +29,8 @@ import {
   Moon,
   LayoutGrid,
   MessageCircle,
+  Bell,
+  LifeBuoy,
 } from "lucide-react";
 
 const DAYS = [
@@ -95,6 +97,53 @@ export default function MentorDashboard() {
   const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
   const [editingAvailability, setEditingAvailability] = useState([]);
   const [savingAvailability, setSavingAvailability] = useState(false);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  const notifBtnRef = useRef(null);
+  const notifRef = useRef(null);
+
+  // close notifications on outside click or Escape
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    const handleClickOutside = (e) => {
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(e.target) &&
+        notifBtnRef.current &&
+        !notifBtnRef.current.contains(e.target)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+
+    const handleKey = (e) => {
+      if (e.key === "Escape") setShowNotifications(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [showNotifications]);
+
+  // Listen for socket notifications forwarded via DOM event
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const payload = e.detail;
+        setNotifications((prev) => [payload, ...prev]);
+      } catch (err) {
+        console.error("socket notification handler error:", err);
+      }
+    };
+    window.addEventListener("socket:notification", handler);
+    return () => window.removeEventListener("socket:notification", handler);
+  }, []);
 
   const [activeTab, setActiveTab] = useState("home");
 
@@ -199,6 +248,8 @@ export default function MentorDashboard() {
       await api.patch(`/requests/mentor/${reqId}`, { action });
 
       setRequests((prev) => prev.filter((r) => r._id !== reqId));
+      // remove any matching notification for this request
+      setNotifications((prev) => prev.filter((n) => !(n.request && String(n.request._id) === String(reqId))));
 
       if (action === "accept") {
         setToast("Request accepted ✓");
@@ -286,6 +337,21 @@ export default function MentorDashboard() {
               }`}
             />
           </button>
+
+          {/* SUPPORT */}
+          <button
+            onClick={() => {
+              setActiveTab('support');
+              navigate('/support');
+            }}
+            className="transition"
+          >
+            <LifeBuoy
+              className={`w-6 h-6 ${
+                activeTab === 'support' ? 'text-sky-400' : 'text-slate-300 hover:text-sky-400'
+              }`}
+            />
+          </button>
         </div>
 
         {/* SETTINGS BOTTOM */}
@@ -310,17 +376,149 @@ export default function MentorDashboard() {
 
       {/* ----------------- NAVBAR ----------------- */}
       <nav className="ml-16 flex items-center justify-between px-6 py-4 border-b border-slate-800/70 bg-slate-900/40 backdrop-blur-lg shadow-lg">
-        <Brand className="text-white" />
+        <div className="flex items-center gap-4">
+          <Brand className="text-white" />
+          {/* Reports button removed for mentors */}
+        </div>
 
-        {/* Avatar */}
-        <button
-          onClick={() => setMentorModalOpen(true)}
-          className="flex items-center gap-3"
-        >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-semibold text-white shadow-md">
-            {getInitials(fullName)}
-          </div>
-        </button>
+        <div className="flex items-center gap-4 relative">
+          {/* Notifications */}
+          <button
+            ref={notifBtnRef}
+            onClick={() => setShowNotifications((v) => !v)}
+            aria-expanded={showNotifications}
+            aria-controls="mentor-notifications"
+            className="relative rounded-full bg-slate-800/70 p-2 border border-slate-700 hover:border-sky-500 transition"
+          >
+            <Bell className="w-5 h-5 text-slate-200" />
+            {requests.length + notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 min-w-[1rem] px-1 rounded-full bg-rose-500 text-[10px] font-semibold text-white flex items-center justify-center">
+                {requests.length + notifications.length}
+              </span>
+            )}
+          </button>
+
+          {/* Avatar */}
+          <button
+            onClick={() => setMentorModalOpen(true)}
+            className="flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-semibold text-white shadow-md">
+              {getInitials(fullName)}
+            </div>
+          </button>
+
+          {showNotifications && (
+            <div
+              ref={notifRef}
+              id="mentor-notifications"
+              role="dialog"
+              aria-label="Notifications"
+              className="fixed right-6 top-20 w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 space-y-3 z-50 backdrop-blur-sm"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Notifications</h3>
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+
+              {notifications.length === 0 && requests.length === 0 && (
+                <p className="text-sm text-slate-400">No notifications.</p>
+              )}
+
+              {notifications.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {notifications.map((n, idx) => (
+                    <div key={`n-${idx}-${n.type}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-2">
+                      <div className="flex items-center justify-between text-sm text-slate-200">
+                        <span className="font-semibold">{n.type}</span>
+                        <span className="text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{n.request?.note || n.message?.text || JSON.stringify(n.request?.slot || n.message?.type || '')}</p>
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        {n.request && (
+                          <>
+                            <button
+                              onClick={() => openStudentProfile(n.request.studentId)}
+                              className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => { handleRequestAction(n.request._id, 'accept'); setNotifications((prev) => prev.filter((x) => x !== n)); }}
+                              className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => { handleRequestAction(n.request._id, 'reject'); setNotifications((prev) => prev.filter((x) => x !== n)); }}
+                              className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {n.message && (
+                          <button
+                            onClick={() => { navigate(`/chat/${n.conversationId}`); setNotifications((prev) => prev.filter((x) => x !== n)); }}
+                            className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                          >
+                            Open Chat
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {requests.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {requests.map((r) => (
+                    <div
+                      key={r._id}
+                      className="rounded-lg border border-slate-800 bg-slate-900/70 p-2"
+                    >
+                      <div className="flex items-center justify-between text-sm text-slate-200">
+                        <span className="font-semibold">{r.studentName || "Student"}</span>
+                        <span className="text-xs text-slate-400">
+                          {new Date(r.requestedAt || Date.now()).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                        {r.note || "New mentorship request"}
+                      </p>
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openStudentProfile(r.studentId)}
+                          className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleRequestAction(r._id, "accept")}
+                          className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleRequestAction(r._id, "reject")}
+                          className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* ----------------- MAIN CONTENT ----------------- */}
