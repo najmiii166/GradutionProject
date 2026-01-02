@@ -6,7 +6,7 @@ const MentorProfileSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     institution: { type: String, required: true },
     faculty: { type: String, required: true },
-    department: { type: String, required: true },
+    department: { type: String },
     yearsOfExperience: { type: Number, min: 0, required: true },
     bio: { type: String, maxlength: 1000 },
     expertiseAreas: [{ type: String, trim: true }],
