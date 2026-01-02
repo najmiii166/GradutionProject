@@ -22,6 +22,10 @@ router.post("/open", auth, async (req, res) => {
   if (!convo) {
     convo = await Conversation.create({ mentor: mentorId, student: studentId });
     created = true;
+    // populate mentor/student names for immediate client use
+    convo = await Conversation.findById(convo._id)
+      .populate("mentor", "fullName")
+      .populate("student", "fullName");
   }
 
   // If we created a new conversation, notify both participants in real-time
@@ -169,19 +173,6 @@ router.post(
         ...populated.toObject(),
         conversationId: convoId,
       });
-      // Also notify the other participant directly (user-level) so they receive a notification
-      try {
-        const otherUserId = String(convo.mentor) === String(sender) ? convo.student : convo.mentor;
-        if (otherUserId) {
-          io.to(String(otherUserId)).emit("notification", {
-            type: "chat:new_message",
-            conversationId: convoId,
-            message: populated,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to emit user-level chat notification:", e);
-      }
     } catch (err) {
       console.error("Socket error:", err);
     }

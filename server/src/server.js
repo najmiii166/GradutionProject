@@ -13,10 +13,6 @@ import mentorRoutes from "./routes/mentor.routes.js";
 import requestRoutes from "./routes/request.route.js";
 import userRoutes from "./routes/user.route.js";
 import chatRoutes from "./routes/chat.routes.js";
-import reportsRoutes from "./routes/reports.routes.js";
-import supportRoutes from "./routes/support.routes.js";
-import adminTicketsRoutes from "./routes/admin.tickets.js";
-import enrollmentsRoutes from "./routes/enrollments.routes.js";
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -25,7 +21,6 @@ import http from "http";
 import { Server } from "socket.io";
 import socketAuth from "./middleware/socketAuth.js";
 import { ensureAdminExists } from "./seed/seedAdmin.js";
-import Message from "./models/Message.js";
 
 import httpProxy from "http-proxy";
 
@@ -46,22 +41,6 @@ const allowedOrigins = [
 ];
 
 console.log("Allowed Origins =>", allowedOrigins);
-
-/* =====================================================
-   ENVIRONMENT VALIDATION
-   - Log whether OPENAI_API_KEY is loaded
-   - In production, fail fast if missing to avoid silent errors
-===================================================== */
-const hasOpenAiKey = !!process.env.OPENAI_API_KEY;
-if (hasOpenAiKey) {
-  console.log("✅ OPENAI_API_KEY loaded (will be used for report generation)");
-} else {
-  console.error("⚠️ OPENAI_API_KEY is NOT set. AI report generation will fail if attempted.");
-  if (process.env.NODE_ENV === "production") {
-    console.error("FATAL: OPENAI_API_KEY is required in production. Exiting.");
-    process.exit(1);
-  }
-}
 
 app.use(
   cors({
@@ -89,11 +68,6 @@ app.use("/api/mentor", mentorRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chat", chatRoutes);
-app.use("/api/reports", reportsRoutes);
-app.use("/api/support", supportRoutes);
-// mount admin tickets alongside existing admin router so path becomes /api/admin/tickets
-app.use("/api/admin", adminTicketsRoutes);
-app.use("/api/enrollments", enrollmentsRoutes);
 
 app.get("/", (_, res) => res.send("MentorLink API Running"));
 

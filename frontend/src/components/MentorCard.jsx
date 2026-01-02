@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Calendar, Sparkles, Briefcase } from "lucide-react";
-import { faculties } from "../constants/systemData";
 
 export default function MentorCard({ mentor, onClick }) {
   const name = mentor.user?.fullName || "Unknown Mentor";
@@ -51,17 +50,14 @@ export default function MentorCard({ mentor, onClick }) {
             <Sparkles className="w-3 h-3 text-cyan-400" /> Expertise
           </p>
           <div className="flex flex-wrap gap-1">
-            {expertise.slice(0, 2).map((tag, i) => {
-              const friendly = (faculties.flatMap(f => f.subs).find(s => s.key === tag) || { name: tag }).name;
-              return (
-                <span
-                  key={i}
-                  className="px-2 py-[2px] rounded-full bg-slate-800/60 border border-cyan-600/40 text-[0.7rem] text-sky-200"
-                >
-                  {friendly}
-                </span>
-              );
-            })}
+            {expertise.slice(0, 2).map((tag, i) => (
+              <span
+                key={i}
+                className="px-2 py-[2px] rounded-full bg-slate-800/60 border border-cyan-600/40 text-[0.7rem] text-sky-200"
+              >
+                {tag}
+              </span>
+            ))}
             {expertise.length > 2 && (
               <span className="px-2 py-[2px] rounded-full bg-slate-800/60 text-slate-400 text-[0.7rem]">
                 +{expertise.length - 2} more

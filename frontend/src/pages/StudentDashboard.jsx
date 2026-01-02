@@ -1,5 +1,5 @@
 // src/pages/StudentDashboard.jsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { api, setAuthToken } from "../api/axios";
@@ -15,8 +15,7 @@ import { motion } from "framer-motion";
 import {
   Users,
   Clock,
-    Mail,
-    LifeBuoy,
+  Mail,
   XCircle,
   LayoutGrid,
   MessageCircle,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 
 import Brand from "../components/Brand";
-import TimeRemaining from "../components/TimeRemaining";
 
 function getInitials(name = "") {
   const parts = name.trim().split(" ");
@@ -75,48 +73,6 @@ export default function StudentDashboard() {
   // Sidebar active tab
   const [activeTab, setActiveTab] = useState("home");
 
-  const [showNotifications, setShowNotifications] = useState(false);
-  const notifBtnRef = useRef(null);
-  const notifRef = useRef(null);
-
-  const [notifications, setNotifications] = useState([]);
-
-  useEffect(() => {
-    const handler = (e) => {
-      try {
-        const payload = e.detail;
-        setNotifications((prev) => [payload, ...prev]);
-      } catch (err) {
-        console.error("socket notification handler error:", err);
-      }
-    };
-    window.addEventListener("socket:notification", handler);
-    return () => window.removeEventListener("socket:notification", handler);
-  }, []);
-
-  useEffect(() => {
-    if (!showNotifications) return;
-    const handleClickOutside = (e) => {
-      if (
-        notifRef.current &&
-        !notifRef.current.contains(e.target) &&
-        notifBtnRef.current &&
-        !notifBtnRef.current.contains(e.target)
-      ) {
-        setShowNotifications(false);
-      }
-    };
-    const handleKey = (e) => {
-      if (e.key === "Escape") setShowNotifications(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [showNotifications]);
-
   // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -140,22 +96,6 @@ export default function StudentDashboard() {
         setToast("Failed to load dashboard data.");
       } finally {
         setLoading(false);
-      }
-    })();
-  }, []);
-
-  // Load student's enrollments (for Time Remaining)
-  const [enrollments, setEnrollments] = useState([]);
-  const [enrollLoading, setEnrollLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get(`/enrollments/student/${user._id}`);
-        setEnrollments(data.enrollments || []);
-      } catch (err) {
-        console.error('Failed to load enrollments', err);
-      } finally {
-        setEnrollLoading(false);
       }
     })();
   }, []);
@@ -248,21 +188,6 @@ export default function StudentDashboard() {
             />
           </button>
 
-          {/* SUPPORT */}
-          <button
-            onClick={() => {
-              setActiveTab('support');
-              navigate('/support');
-            }}
-            className="transition"
-          >
-            <LifeBuoy
-              className={`w-6 h-6 ${
-                activeTab === 'support' ? 'text-sky-400' : 'text-slate-300 hover:text-sky-400'
-              }`}
-            />
-          </button>
-
         </div>
 
         {/* SETTINGS */}
@@ -298,148 +223,6 @@ export default function StudentDashboard() {
           <span className="hidden sm:block text-sm text-slate-200 font-medium">
             {user.fullName}
           </span>
-
-          {/* Notifications bell */}
-          <div className="relative">
-            <button
-              ref={notifBtnRef}
-              onClick={() => setShowNotifications((v) => !v)}
-              aria-expanded={showNotifications}
-              aria-controls="student-notifications"
-              className="relative rounded-full bg-slate-800/70 p-2 border border-slate-700 hover:border-sky-500 transition mr-2"
-            >
-              <Mail className="w-5 h-5 text-slate-200" />
-              {activeCount + notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 min-w-[1rem] px-1 rounded-full bg-rose-500 text-[10px] font-semibold text-white flex items-center justify-center">
-                  {activeCount + notifications.length}
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div
-                ref={notifRef}
-                id="student-notifications"
-                role="dialog"
-                aria-label="Notifications"
-                className="fixed right-6 top-20 w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 space-y-3 z-50 backdrop-blur-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">Notifications</h3>
-                  <button
-                    onClick={() => setShowNotifications(false)}
-                    className="text-xs text-slate-400 hover:text-white"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                {notifications.length === 0 && requests.length === 0 && (
-                  <p className="text-sm text-slate-400">No notifications.</p>
-                )}
-
-                {notifications.length > 0 && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {notifications.map((n, idx) => (
-                      <div key={`n-${idx}-${n.type}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-2">
-                        <div className="flex items-center justify-between text-sm text-slate-200">
-                          <span className="font-semibold">{n.type}</span>
-                          <span className="text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{n.request?.note || n.message?.text || ''}</p>
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          {n.request && (
-                            <>
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const mentorUserId = n.request.mentorUserId || n.request.mentorId;
-                                    const { data } = await api.get(`/mentor/mentors/${mentorUserId}`);
-                                    setSelectedMentor(data || null);
-                                    setShowProfile(true);
-                                    setShowNotifications(false);
-                                    setNotifications((prev) => prev.filter((x) => x !== n));
-                                  } catch (err) {
-                                    setToast("Failed to load mentor profile.");
-                                  }
-                                }}
-                                className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                              >
-                                View
-                              </button>
-                              {n.request.status === "pending" && (
-                                <button
-                                  onClick={() => { cancelRequest(n.request._id); setShowNotifications(false); setNotifications((prev) => prev.filter((x) => x !== n)); }}
-                                  className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
-                                >
-                                  Cancel
-                                </button>
-                              )}
-                              {n.request.status === "rejected" && (
-                                <button
-                                  onClick={() => { deleteRejected(n.request._id); setShowNotifications(false); setNotifications((prev) => prev.filter((x) => x !== n)); }}
-                                  className="text-xs px-2 py-1 rounded-md bg-slate-700 text-white hover:bg-slate-600"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {n.message && (
-                            <button
-                              onClick={() => { navigate(`/chat/${n.conversationId}`); setNotifications((prev) => prev.filter((x) => x !== n)); setShowNotifications(false); }}
-                              className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                            >
-                              Open Chat
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {requests.length > 0 && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {requests.map((r) => (
-                      <div key={r._id} className="rounded-lg border border-slate-800 bg-slate-900/70 p-2">
-                        <div className="flex items-center justify-between text-sm text-slate-200">
-                          <span className="font-semibold">{r.mentorId?.user?.fullName || "Mentor"}</span>
-                          <span className="text-xs text-slate-400">{new Date(r.requestedAt || Date.now()).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{r.note || "Mentorship request"}</p>
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => { setSelectedMentor(r.mentorId); setShowProfile(false); setShowNotifications(false); setSelectedMentor(r.mentorId); setShowProfile(true); }}
-                            className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                          >
-                            View
-                          </button>
-                          {r.status === "pending" && (
-                            <button
-                              onClick={() => { cancelRequest(r._id); setShowNotifications(false); }}
-                              className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                          {r.status === "rejected" && (
-                            <button
-                              onClick={() => { deleteRejected(r._id); setShowNotifications(false); }}
-                              className="text-xs px-2 py-1 rounded-md bg-slate-700 text-white hover:bg-slate-600"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           <button
             onClick={() => setShowProfile(true)}
             className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center font-semibold text-white shadow-md hover:shadow-sky-400/20 transition"
@@ -453,21 +236,6 @@ export default function StudentDashboard() {
       <div className="ml-16 mx-auto max-w-7xl px-6 py-8 space-y-8">
 
         {/* KPI Cards */}
-        {/* Enrollment Panel */}
-        {!enrollLoading && enrollments.length > 0 && (
-          <div className="rounded-xl p-4 bg-slate-900/60 border border-slate-800 shadow-lg mb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400">Current Mentorship</p>
-                <p className="text-lg font-semibold">{enrollments[0].mentor?.fullName || 'Mentor'}</p>
-              </div>
-              <div>
-                <TimeRemaining expiryDate={enrollments[0].expiryDate} />
-              </div>
-            </div>
-          </div>
-        )}
-
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

@@ -8,10 +8,7 @@ const StudentProfileSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    // `faculty` is the canonical faculty key (e.g., 'cs', 'business', 'health')
-    faculty: { type: String, required: true },
-    // `major` kept optional for legacy/free-text values
-    major: { type: String },
+    major: { type: String, required: true },
     semester: { type: String, required: true },
     idCardUrl: { type: String, required: true },
 

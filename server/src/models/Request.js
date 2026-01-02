@@ -16,12 +16,9 @@ const RequestSchema = new mongoose.Schema({
     from: { type: String, required: true },
     to: { type: String, required: true },
   },
-  // Session tracking
-  startTime: { type: Date },
-  endTime: { type: Date },
   status: {
     type: String,
-    enum: ["pending", "accepted", "rejected", "scheduled", "ongoing", "completed"],
+    enum: ["pending", "accepted", "rejected", "upcoming", "completed"],
     default: "pending",
   },
   requestedAt: {

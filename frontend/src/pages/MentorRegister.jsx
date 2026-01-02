@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
-import { universities, faculties } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
 import Toast from "../components/Toast";
@@ -15,6 +14,8 @@ import {
   Building2,
   BookMarked,
   Briefcase,
+  PenLine,
+  BadgeCheck,
   CalendarDays,
   Eye,
   EyeOff,
@@ -31,9 +32,11 @@ export default function MentorRegister() {
     password: "",
     institution: "",
     faculty: "",
+    department: "",
     yearsOfExperience: "",
     bio: "",
     expertiseAreas: "",
+    university: "",
   });
 
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -52,20 +55,8 @@ export default function MentorRegister() {
   const [showPassword, setShowPassword] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
   const navigate = useNavigate();
-  const [selectedFacultyKey, setSelectedFacultyKey] = useState(null);
-  const [selectedInstitutionKey, setSelectedInstitutionKey] = useState(null);
-  const [selectedSubAreas, setSelectedSubAreas] = useState([]);
-  const [socialLinks, setSocialLinks] = useState({ linkedin: '', website: '' });
 
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const onInstitutionSelect = (e) => {
-    const key = e.target.value;
-    setSelectedInstitutionKey(key || null);
-    setForm((f) => ({ ...f, institution: key || "" }));
-  };
-
-  
 
   const toggleDay = (day) => {
     setAvailability((a) =>
@@ -87,57 +78,33 @@ export default function MentorRegister() {
 
   const submit = async (e) => {
     e.preventDefault();
-    // Validate required fields (faculty is selectedFacultyKey)
-    if (!String(form.fullName || "").trim()) return setToast('Please fill the required field: fullName');
-    if (!String(form.email || "").trim()) return setToast('Please fill the required field: email');
-    if (!String(form.password || "").trim()) return setToast('Please fill the required field: password');
-    if (!selectedInstitutionKey) return setToast('Please select an Institution');
-    if (!selectedFacultyKey) return setToast('Please select a Faculty');
+    const required = [
+      "fullName",
+      "email",
+      "password",
+      "institution",
+      "faculty",
+      "department",
+    ];
+
+    const missing = required.find((k) => !String(form[k] || "").trim());
+    if (missing) return setToast(`Please fill the required field: ${missing}`);
 
     if (!strongPasswordRegex.test(form.password))
       return setToast(
         "Password must be 8+ chars and include upper, lower, number & symbol"
       );
 
-    // mentors provide `institution` only (no university select)
-
-    // require at least one social profile (LinkedIn or Portfolio)
-    const providedSocial = Object.values(socialLinks).map(s => (s || '').trim()).filter(Boolean);
-    if (providedSocial.length === 0) return setToast('Please provide at least one social profile URL (LinkedIn or Portfolio)');
-    // validate URLs (add https:// if missing)
-    for (const raw of providedSocial) {
-      let url = raw;
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      try {
-        new URL(url);
-      } catch (err) {
-        return setToast('Invalid social URL: ' + raw);
-      }
-    }
-
     setLoading(true);
 
     try {
-      const normalizedSocial = {};
-      Object.entries(socialLinks).forEach(([k,v]) => {
-        if (v && String(v).trim()) {
-          let url = String(v).trim();
-          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-          normalizedSocial[k] = url;
-        }
-      });
-
       const payload = {
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
-        institution: selectedInstitutionKey,
-        faculty: selectedFacultyKey,
-        // department removed; institution is authoritative
+        ...form,
         yearsOfExperience: Number(form.yearsOfExperience || 0),
-        bio: form.bio,
-        expertiseAreas: Array.isArray(selectedSubAreas) ? selectedSubAreas : [],
-        socialLinks: normalizedSocial,
+        expertiseAreas: form.expertiseAreas
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
         availability: availability
           .filter((d) => d.available)
           .map(({ day, from, to }) => ({ day, from, to })),
@@ -152,14 +119,12 @@ export default function MentorRegister() {
         password: "",
         institution: "",
         faculty: "",
+        department: "",
         yearsOfExperience: "",
         bio: "",
         expertiseAreas: "",
+        university: "",
       });
-      setSelectedFacultyKey(null);
-      setSelectedInstitutionKey(null);
-      setSelectedSubAreas([]);
-      setSocialLinks({ linkedin: '', website: '' });
     } catch (err) {
       const msg =
         err.response?.data?.message ||
@@ -210,73 +175,21 @@ export default function MentorRegister() {
               { icon: Mail, name: "email", type: "email", placeholder: "Email address" },
               { icon: Building2, name: "institution", placeholder: "Institution" },
               { icon: BookMarked, name: "faculty", placeholder: "Faculty" },
+              { icon: PenLine, name: "department", placeholder: "Department" },
               { icon: Briefcase, name: "yearsOfExperience", type: "number", placeholder: "Years of Experience" },
+              { icon: BadgeCheck, name: "university", placeholder: "University (optional)" },
             ].map((f, i) => (
               <div className="relative" key={i}>
                 <f.icon className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                {f.name === 'institution' ? (
-                  <div>
-                    <select
-                      name={f.name}
-                      value={selectedInstitutionKey || ""}
-                      onChange={onInstitutionSelect}
-                      required={i < 4}
-                      className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    >
-                      <option value="">Select Institution</option>
-                      {universities.map((u) => (
-                        <option key={u.key} value={u.key}>{u.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : f.name === 'faculty' ? (
-                  <div>
-                    <select
-                      name={f.name}
-                      value={selectedFacultyKey || ""}
-                      onChange={(e) => setSelectedFacultyKey(e.target.value || null)}
-                      required={i < 4}
-                      className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    >
-                      <option value="">Select Faculty</option>
-                      {faculties.map((fac) => (
-                        <option key={fac.key} value={fac.key}>{fac.name}</option>
-                      ))}
-                    </select>
-
-                    {/* show sub-area checkboxes immediately under faculty select */}
-                    {selectedFacultyKey ? (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-sm text-slate-600">Select expertise areas</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
-                            <label key={sub.key} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded text-sm">
-                              <input
-                                type="checkbox"
-                                checked={selectedSubAreas.includes(sub.key)}
-                                onChange={(e) => {
-                                  if (e.target.checked) setSelectedSubAreas((s) => [...s, sub.key]);
-                                  else setSelectedSubAreas((s) => s.filter(x => x !== sub.key));
-                                }}
-                              />
-                              <span>{sub.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <input
-                    type={f.type || "text"}
-                    name={f.name}
-                    placeholder={f.placeholder}
-                    value={form[f.name]}
-                    onChange={update}
-                    required={i < 4}
-                    className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                  />
-                )}
+                <input
+                  type={f.type || "text"}
+                  name={f.name}
+                  placeholder={f.placeholder}
+                  value={form[f.name]}
+                  onChange={update}
+                  required={i < 5}
+                  className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                />
               </div>
             ))}
 
@@ -310,29 +223,15 @@ export default function MentorRegister() {
               className="w-full rounded-lg border border-gray-300 bg-white/70 p-3 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400"
             />
 
-            {/* SOCIAL PROFILES (at least one required) */}
-            <div className="mt-2">
-              <p className="text-sm font-semibold text-gray-700 mb-2">Social profiles (at least one required)</p>
-              <input
-                type="text"
-                name="linkedin"
-                placeholder="LinkedIn profile /Portfolio URL"
-                value={socialLinks.linkedin}
-                onChange={(e) => setSocialLinks(s => ({ ...s, linkedin: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 bg-white/70 p-2 text-sm text-gray-700 placeholder-gray-400 mb-2"
-              />
-              {/* Twitter / TikTok removed — only LinkedIn and Portfolio requested */}
-              <input
-                type="text"
-                name="website"
-                placeholder="Twitter/Tiktok"
-                value={socialLinks.website}
-                onChange={(e) => setSocialLinks(s => ({ ...s, website: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 bg-white/70 p-2 text-sm text-gray-700 placeholder-gray-400"
-              />
-            </div>
-
-            {/* expertise checkboxes moved to render immediately under faculty select */}
+            {/* EXPERTISE */}
+            <input
+              type="text"
+              name="expertiseAreas"
+              placeholder="Expertise areas (comma separated)"
+              value={form.expertiseAreas}
+              onChange={update}
+              className="w-full rounded-lg border border-gray-300 bg-white/70 p-3 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400"
+            />
 
             {/* AVAILABILITY SECTION */}
             <div className="mt-6">

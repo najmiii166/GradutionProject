@@ -3,8 +3,7 @@ import { api } from "../api/axios";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
 import Toast from "../components/Toast";
-import { Home, Users, Clock, LogOut, FileText } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Home, Users, Clock, LogOut } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -31,7 +30,6 @@ const buildIdCardSrc = (url) => {
 };
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
   const [activePage, setActivePage] = useState("overview");
   const [activeRole, setActiveRole] = useState("student");
   const [pending, setPending] = useState([]);
@@ -138,11 +136,6 @@ useEffect(() => {
     setDetail(null);
   };
 
-      {activePage === 'reports' && (
-        <main className="flex-1 p-8 overflow-auto">
-          <ReportsAdminPage api={api} />
-        </main>
-      )}
   const handleApprove = async (userId) => {
     try {
       await api.post(`/admin/users/${userId}/approve`);
@@ -187,8 +180,8 @@ useEffect(() => {
           <SidebarButton active={activePage === "overview"} icon={<Home size={15} />} label="Overview" onClick={() => setActivePage("overview")} />
           <SidebarButton active={activePage === "pending"} icon={<Clock size={15} />} label="Pending Users" onClick={() => setActivePage("pending")} />
           <SidebarButton active={activePage === "users"} icon={<Users size={15} />} label="Users " onClick={() => setActivePage("users")}/>
-          <SidebarButton icon={<FileText size={15} />} label="Reports" onClick={() => setActivePage('reports')} />
-          <SidebarButton icon={<FileText size={15} />} label="Tickets" onClick={() => navigate('/admin/tickets')} />
+
+          <SidebarButton icon={<Users size={15} />} label="Reports (soon)" disabled />
         </nav>
 
         <div className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500 flex items-center justify-between">
@@ -207,19 +200,15 @@ useEffect(() => {
       <main className="flex-1 flex flex-col">
         <header className="border-b border-slate-800 px-8 py-4 flex items-center justify-between">
           <div>
-              <h1 className="text-lg font-semibold">
-                {activePage === "overview" ? "🏠 Overview" : activePage === "pending" ? "⏳ Pending Users Approval" : activePage === 'reports' ? 'Report' : 'Users'}
-              </h1>
-              <p className="text-xs text-slate-400">
-                {activePage === "overview"
-                  ? "Summary of analytics and platform statistics."
-                  : activePage === "pending"
-                  ? "Review student and mentor account requests"
-                  : activePage === 'reports'
-                  ? ''
-                  : ''}
-              </p>
-            </div>
+            <h1 className="text-lg font-semibold">
+              {activePage === "overview" ? "🏠 Overview" : "⏳ Pending Users Approval"}
+            </h1>
+            <p className="text-xs text-slate-400">
+              {activePage === "overview"
+                ? "Summary of analytics and platform statistics."
+                : "Review student and mentor account requests"}
+            </p>
+          </div>
         </header>
 
     {activePage === "overview" ? (
@@ -242,8 +231,6 @@ useEffect(() => {
         setToast,
         pendingCounts,
       }} />
-    ) : activePage === 'reports' ? (
-      <ReportsAdminPage api={api} />
     ) : (
       <UsersManagementPage
         users={usersList}
@@ -395,353 +382,6 @@ function ChartBox({ title, children }) {
         {children}
       </ResponsiveContainer>
     </div>
-  );
-}
-
-
-/* ---------------- Reports Admin Page ---------------- */
-function ReportsAdminPage({ api }) {
-  // view buttons removed; use `roleFilter` dropdown instead
-  const [data, setData] = useState(null);
-  const [metrics, setMetrics] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [roleFilter, setRoleFilter] = useState('mentor');
-  const [datePreset, setDatePreset] = useState('this_month');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [rows, setRows] = useState([]);
-  const [originalRows, setOriginalRows] = useState([]);
-  const [rowsLoading, setRowsLoading] = useState(false);
-  const [applied, setApplied] = useState(false);
-  const [drillType, setDrillType] = useState('none');
-  const [drillRows, setDrillRows] = useState([]);
-  const [selectedDrill, setSelectedDrill] = useState(null);
-  const [uniRatios, setUniRatios] = useState([]);
-
-  useEffect(() => {
-    loadMentorReports();
-  }, []);
-
-  async function loadMentorReports() {
-    setLoading(true);
-    try {
-      const [r1, r2] = await Promise.all([
-        api.get("/admin/reports/mentors"),
-        api.get("/admin/metrics-debug"),
-      ]);
-      setData(r1.data || {});
-      setMetrics(r2.data?.metrics || r2.data || {});
-    } catch (err) {
-      console.error("Failed to load mentor reports or metrics", err);
-      setData(null);
-      setMetrics(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // removed charts and full-report PDF export per request
-
-  async function loadUserRows() {
-    setRowsLoading(true);
-    try {
-      let start = null;
-      let end = null;
-      const now = new Date();
-      if (datePreset === 'this_month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        end = new Date().toISOString();
-      } else if (datePreset === 'last_month') {
-        const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const last = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-        start = first.toISOString();
-        end = last.toISOString();
-      } else if (datePreset === 'range') {
-        if (startDate) start = new Date(startDate).toISOString();
-        if (endDate) {
-          const d = new Date(endDate);
-          d.setHours(23,59,59,999);
-          end = d.toISOString();
-        }
-      }
-
-      const params = { role: roleFilter };
-      if (datePreset === 'all') {
-        // 'All' removes date filtering and requests full rows
-        params.full = true;
-      } else {
-        if (start) params.start = start;
-        if (end) params.end = end;
-        params.top = 1000;
-      }
-
-      const { data } = await api.get('/admin/reports/users', { params });
-      setRows(data.rows || []);
-      setOriginalRows(data.rows || []);
-      setApplied(true);
-    } catch (err) {
-      console.error('Failed to load rows', err);
-      setRows([]);
-    } finally {
-      setRowsLoading(false);
-    }
-  }
-
-  async function loadDrilldown() {
-    try {
-      let start = null;
-      let end = null;
-      const now = new Date();
-      if (datePreset === 'this_month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        end = new Date().toISOString();
-      } else if (datePreset === 'last_month') {
-        const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const last = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-        start = first.toISOString();
-        end = last.toISOString();
-      } else if (datePreset === 'range') {
-        if (startDate) start = new Date(startDate).toISOString();
-        if (endDate) {
-          const d = new Date(endDate);
-          d.setHours(23,59,59,999);
-          end = d.toISOString();
-        }
-      }
-
-      if (drillType === 'topStudentUniversities') {
-        const params = { type: 'topStudentUniversities', top: 50 };
-        if (datePreset !== 'all') {
-          if (start) params.start = start;
-          if (end) params.end = end;
-        }
-        const { data } = await api.get('/admin/reports/drilldown/students', { params });
-        setDrillRows(data.rows || []);
-      } else if (drillType === 'topStudentAreas') {
-        const params = { type: 'topStudentAreas', top: 50 };
-        if (datePreset !== 'all') {
-          if (start) params.start = start;
-          if (end) params.end = end;
-        }
-        const { data } = await api.get('/admin/reports/drilldown/students', { params });
-        setDrillRows(data.rows || []);
-      } else {
-        setDrillRows([]);
-      }
-    } catch (err) {
-      console.error('Failed to load drilldown', err);
-      setDrillRows([]);
-    }
-  }
-
-  async function loadUniversityRatios() {
-    try {
-      const { data } = await api.get('/admin/reports/university-ratios');
-      setUniRatios(data.rows || []);
-    } catch (err) {
-      console.error('Failed to load university ratios', err);
-      setUniRatios([]);
-    }
-  }
-
-  async function exportTablePdf() {
-    try {
-      const mod = await import('jspdf');
-      const jsPDF = (mod && (mod.jsPDF || mod.default)) || null;
-      if (!jsPDF) throw new Error('jspdf module not found');
-      const doc = new jsPDF({ unit: 'px', format: 'a4' });
-      const el = document.getElementById('mentor-users-table');
-      if (!el) return alert('Table element not found');
-      try {
-        await doc.html(el, { x: 10, y: 10 });
-        doc.save(`users-table-${Date.now()}.pdf`);
-      } catch (innerErr) {
-        // fallback: simple text PDF dump
-        console.warn('html export failed, falling back to text PDF', innerErr);
-        const fallback = new jsPDF({ unit: 'pt', format: 'a4' });
-        const lines = [];
-        const headers = ['Name', 'Email', 'Role', 'Institution', 'Joined'];
-        lines.push(headers.join(' | '));
-        (rows || []).forEach(r => {
-          lines.push([r.name || '-', r.email || '-', r.role || '-', r.institution || '-', r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'].join(' | '));
-        });
-        let y = 40;
-        fallback.setFontSize(10);
-        fallback.text('Users Table', 40, 24);
-        lines.forEach(line => {
-          fallback.text(line, 40, y);
-          y += 12;
-          if (y > 750) { y = 40; fallback.addPage(); }
-        });
-        fallback.save(`users-table-${Date.now()}.pdf`);
-      }
-    } catch (err) {
-      console.error('Export table PDF failed', err);
-      alert('Failed to export table PDF: ' + (err?.message || err));
-    }
-  }
-
-  return (
-    <section className="p-6 h-full overflow-auto" id="mentor-report-root">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3"></div>
-        <div className="flex items-center gap-2">{/* using role selector below */}</div>
-      </div>
-
-      {loading && <div className="text-sm text-slate-400">Loading report...</div>}
-
-      <div id="mentor-report" className="space-y-6">
-          <header className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">{applied ? (roleFilter === 'mentor' ? 'Mentors — Report' : roleFilter === 'student' ? 'Students — Report' : 'All Users — Report') : 'Report'}</h2>
-              {applied && <p className="text-sm text-slate-400">Generated: {new Date().toLocaleString()}</p>}
-            </div>
-            <div className="text-right">
-              {applied && <p className="text-sm text-slate-400">Scope: {roleFilter === 'mentor' ? 'Mentors' : roleFilter === 'student' ? 'Students' : 'All Users'}</p>}
-              {applied && <p className="text-sm text-slate-400">Date: {datePreset === 'range' ? `${startDate || '—'} to ${endDate || '—'}` : datePreset.replace('_',' ')}</p>}
-            </div>
-          </header>
-
-          {/* Filters Row: Role, Date Preset, Range, Show All, Apply */}
-          <div className="mt-4 flex items-center gap-4">
-            <div>
-              <select aria-label="role" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setApplied(false); }} className="ml-2 bg-slate-800 px-2 py-1 rounded">
-                <option value="mentor">Mentors</option>
-                <option value="student">Students</option>
-                <option value="all">All Users</option>
-              </select>
-            </div>
-
-            <div>
-              <div className="mt-1">
-                <select aria-label="date" value={datePreset} onChange={(e)=>{ setDatePreset(e.target.value); setApplied(false); if(e.target.value !== 'range'){ setStartDate(''); setEndDate(''); } }} className="bg-slate-800 px-3 py-1 rounded text-sm">
-                  <option value="this_month">This Month</option>
-                  <option value="last_month">Last Month</option>
-                  <option value="range">Custom Range</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-            </div>
-
-            {datePreset === 'range' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={startDate} onChange={(e)=>{ setStartDate(e.target.value); setApplied(false); }} className="bg-slate-800 px-2 py-1 rounded" />
-                <span className="text-slate-400">to</span>
-                <input type="date" value={endDate} onChange={(e)=>{ setEndDate(e.target.value); setApplied(false); }} className="bg-slate-800 px-2 py-1 rounded" />
-              </div>
-            )}
-
-            {/* 'Show All' removed; use Date → All to return full list */}
-
-            <div className="ml-4">
-              <label className="text-xs text-slate-400 mr-2">Drilldown</label>
-              <select value={drillType} onChange={(e)=>{ setDrillType(e.target.value); setApplied(false); }} className="bg-slate-800 px-2 py-1 rounded mr-4 text-sm">
-                <option value="none">None</option>
-                <option value="topStudentUniversities">Top Universities (Students)</option>
-                <option value="topStudentAreas">Top Areas (Students)</option>
-              </select>
-            </div>
-
-            <div className="ml-auto flex items-center gap-3">
-              <button className="px-3 py-1 bg-sky-600 rounded" onClick={async ()=>{ await loadUserRows(); if(drillType !== 'none') await loadDrilldown(); }}>Apply</button>
-              <button className="px-3 py-1 bg-green-600 rounded text-white" onClick={()=>exportTablePdf()}>Export Table PDF</button>
-              <button className="px-3 py-1 bg-indigo-600 rounded text-white" onClick={loadUniversityRatios}>Student→Mentor Ratio</button>
-            </div>
-          </div>
-
-          {/* Removed KPIs, charts, heatmap and detailed lists per request */}
-
-          {/* Table view */}
-          <section className="bg-slate-900 p-5 rounded">
-            <h4 className="text-slate-300 mb-2">Users</h4>
-            {/* University ratios view */}
-            {uniRatios && uniRatios.length > 0 && (
-              <div className="mb-4 rounded border border-slate-800 bg-slate-950/40 p-3">
-                <p className="text-sm text-slate-300 mb-2">Student → Mentor Ratios (higher means more students per mentor)</p>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-left">
-                    <thead className="text-slate-400 text-xs">
-                      <tr>
-                        <th className="px-2 py-1">University / Institution</th>
-                        <th className="px-2 py-1">Students</th>
-                        <th className="px-2 py-1">Mentors</th>
-                        <th className="px-2 py-1">Student→Mentor Ratio</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-slate-100">
-                      {uniRatios.map((r, i) => (
-                        <tr key={i} className="border-t border-slate-800">
-                          <td className="px-2 py-1">{r.university}</td>
-                          <td className="px-2 py-1">{r.students}</td>
-                          <td className="px-2 py-1">{r.mentors}</td>
-                          <td className="px-2 py-1">{r.ratio === null ? '—' : r.ratio}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            {/* Drilldown results (Top Universities) */}
-            {drillRows && drillRows.length > 0 && (
-              <div className="mb-4 rounded border border-slate-800 bg-slate-950/40 p-3">
-                <p className="text-sm text-slate-300 mb-2">{drillType === 'topStudentAreas' ? 'Top Areas (Students)' : 'Top Universities (Students)'}</p>
-                <div className="flex flex-wrap gap-2">
-                  {drillRows.map((d) => (
-                    <button key={d._id} onClick={() => {
-                      setSelectedDrill(d._id);
-                      // filter rows client-side by institution/university or by area
-                      if (drillType === 'topStudentUniversities') {
-                        setRows((originalRows || []).filter(r => (r.institution || '').toLowerCase() === String(d._id || '').toLowerCase()));
-                      } else if (drillType === 'topStudentAreas') {
-                        setRows((originalRows || []).filter(r => {
-                          const areas = Array.isArray(r.mentorshipAreas) ? r.mentorshipAreas : (r.mentorshipAreas ? [r.mentorshipAreas] : []);
-                          return areas.map(a => String(a || '').toLowerCase()).includes(String(d._id || '').toLowerCase());
-                        }));
-                      }
-                    }} className={`px-3 py-1 rounded text-xs ${selectedDrill === d._id ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
-                      {d._id || '—'} <span className="text-[0.7rem] text-slate-400">({d.count})</span>
-                    </button>
-                  ))}
-                  <button onClick={() => { setSelectedDrill(null); setRows(originalRows || []); }} className="px-3 py-1 rounded text-xs bg-gray-700 text-white">Clear</button>
-                </div>
-              </div>
-            )}
-            <div className="overflow-x-auto">
-              <table id="mentor-users-table" className="min-w-full table-auto divide-y divide-slate-700">
-                <thead>
-                  <tr className="text-left text-slate-300">
-                    <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Email</th>
-                    <th className="px-3 py-2">Role</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">University / Institution</th>
-                    <th className="px-3 py-2">Joined</th>
-                  </tr>
-                </thead>
-                <tbody className="text-slate-100">
-                  {rowsLoading ? (
-                    <tr><td colSpan={5} className="py-4 text-center text-slate-400">Loading rows...</td></tr>
-                  ) : rows.length === 0 ? (
-                    <tr><td colSpan={5} className="py-4 text-center text-slate-400">No rows. Click Apply to load.</td></tr>
-                  ) : rows.map((r) => (
-                    <tr key={r._id} className="border-t border-slate-800">
-                      <td className="px-3 py-2">{r.name}</td>
-                      <td className="px-3 py-2">{r.email}</td>
-                      <td className="px-3 py-2">{r.role}</td>
-                      <td className="px-3 py-2">{r.status || '-'}</td>
-                      <td className="px-3 py-2">{r.institution}</td>
-                      <td className="px-3 py-2">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-      {/* student-specific view removed; use Role filter and table above */}
-    </section>
   );
 }
 
