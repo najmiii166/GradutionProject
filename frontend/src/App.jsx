@@ -28,7 +28,7 @@ import { SocketProvider } from "./Contexts/SocketContext";
 export default function App() {
   return (
     <BrowserRouter>
-      <SocketProvider>
+     
         <Routes>
           {/* Public */}
           <Route path="/" element={<Landing />} />
@@ -41,8 +41,22 @@ export default function App() {
           {/* Dashboards */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/tickets" element={<AdminTickets />} />
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
-          <Route path="/mentor/dashboard" element={<MentorDashboard />} />
+          <Route
+            path="/student/dashboard"
+            element={
+              <SocketProvider>
+                <StudentDashboard />
+              </SocketProvider>
+            }
+          />
+          <Route
+            path="/mentor/dashboard"
+            element={
+              <SocketProvider>
+                <MentorDashboard />
+              </SocketProvider>
+            }
+          />
           <Route path="/mentor/sessions" element={<MentorSessions />} />
           <Route path="/mentor/students" element={<MentorStudents />} />
           <Route path="/support" element={<Support />} />
@@ -51,8 +65,22 @@ export default function App() {
           <Route path="/mentors" element={<AllMentors />} />
 
           {/* ⭐ CHAT */}
-          <Route path="/chat" element={<ChatScreen />} />
-          <Route path="/chat/:id" element={<ChatScreen />} />
+          <Route
+            path="/chat"
+            element={
+              <SocketProvider>
+                <ChatScreen />
+              </SocketProvider>
+            }
+          />
+          <Route
+            path="/chat/:id"
+            element={
+              <SocketProvider>
+                <ChatScreen />
+              </SocketProvider>
+            }
+          />
 
           {/* Reports */}
           <Route path="/reports" element={<ReportHome />} />
@@ -62,7 +90,7 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
-      </SocketProvider>
+     
     </BrowserRouter>
   );
 }

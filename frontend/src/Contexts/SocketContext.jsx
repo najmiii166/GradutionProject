@@ -10,6 +10,9 @@ export function SocketProvider({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return; // do not create socket if not authenticated
+
     const s = createSocket();
     if (!s) return;
 
