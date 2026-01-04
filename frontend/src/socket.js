@@ -19,9 +19,12 @@ try {
 export function createSocket() {
   const token = localStorage.getItem("token");
 
-  const socket = io(SOCKET_URL, {
-    // If connecting via proxy (same-origin), force polling only to avoid websocket upgrades
+  // If SOCKET_URL is empty we want to connect to the current origin
+  // and force long-polling with an explicit `/socket.io` path so Vercel's proxy handles it.
+  const connectUrl = SOCKET_URL || undefined;
+  const socket = io(connectUrl, {
     transports: SOCKET_URL === "" ? ["polling"] : ["polling", "websocket"],
+    path: SOCKET_URL === "" ? "/socket.io" : undefined,
 
     // auth token for socketAuth middleware
     auth: token ? { token } : {},
