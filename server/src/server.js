@@ -101,28 +101,34 @@ app.get("/", (_, res) => res.send("MentorLink API Running 🚀"));
 ================================ */
 const server = http.createServer(app);
 
+// Trust proxy when deployed behind Vercel/Railway
+app.set("trust proxy", true);
+
+// Create Socket.IO server with explicit path and transports
 const io = new Server(server, {
+  path: "/socket.io",
+  transports: ["polling", "websocket"],
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, cb) => {
+      const allowed = !origin || allowedOrigins.includes(origin);
+      cb(null, allowed);
+    },
     credentials: true,
   },
 });
 
 app.set("io", io);
 
-// Log socket handshake origin and enforce allowedOrigins for debugging
+// Log and enforce socket handshake origin
 io.use((socket, next) => {
   const origin = socket.handshake.headers.origin;
   const allowed = !origin || allowedOrigins.includes(origin);
-  console.log(
-    `Socket CORS check - origin: ${origin || "<<no origin>>"} -> ${
-      allowed ? "ALLOWED" : "DENIED"
-    }`
-  );
+  console.log(`Socket CORS check - origin: ${origin || "<<no origin>>"} -> ${allowed ? "ALLOWED" : "DENIED"}`);
   if (!allowed) return next(new Error("Not allowed by CORS"));
   next();
 });
 
+// Auth middleware for socket connections
 io.use(socketAuth);
 
 io.on("connection", (socket) => {
