@@ -53,27 +53,35 @@ console.log("Allowed Origins =>", allowedOrigins);
 /* ===============================
    CORS
 ================================ */
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow server-to-server / curl / health checks
-      if (!origin) return callback(null, true);
+/* ===============================
+   CORS (manual robust handler to ensure preflight works)
+================================ */
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+  // Allow server-to-server/curl requests without origin
+  if (!origin || allowedOrigins.includes(origin)) {
+    if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+    else res.setHeader("Access-Control-Allow-Origin", "*");
 
-      console.error("❌ CORS blocked origin:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type,Authorization"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    console.error("❌ CORS blocked origin:", origin);
+  }
 
-// ✅ MUHIIM: si preflight (OPTIONS) u shaqeeyo
-app.options("*", cors());
+  // Handle preflight
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+
+  next();
+});
 
 app.use(express.json());
 app.use(morgan("dev"));
