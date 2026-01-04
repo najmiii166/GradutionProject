@@ -40,13 +40,12 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
 
-  // Vercel FRONTEND (SAX)
+  // ✅ Vercel (production)
   "https://graduation-project-eight.vercel.app",
+
+  // optional preview domains (waa OK in la reebo)
   "https://graduation-project-git-main-najmiii166s-projects.vercel.app",
   "https://graduation-project-jixjwsqsm-najmiii166s-projects.vercel.app",
-
-  // Railway BACKEND (PUBLIC)
-  "https://graduationproject-production.up.railway.app",
 ];
 
 console.log("Allowed Origins =>", allowedOrigins);
@@ -56,19 +55,25 @@ console.log("Allowed Origins =>", allowedOrigins);
 ================================ */
 app.use(
   cors({
-    origin: (origin, cb) => {
-      const allowed = !origin || allowedOrigins.includes(origin);
-      console.log(
-        `CORS check - origin: ${origin || "<<no origin>>"} -> ${
-          allowed ? "ALLOWED" : "DENIED"
-        }`
-      );
-      if (allowed) cb(null, true);
-      else cb(new Error("Not allowed by CORS"));
+    origin: function (origin, callback) {
+      // Allow server-to-server / curl / health checks
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.error("❌ CORS blocked origin:", origin);
+      return callback(new Error("Not allowed by CORS"));
     },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
+// ✅ MUHIIM: si preflight (OPTIONS) u shaqeeyo
+app.options("*", cors());
 
 app.use(express.json());
 app.use(morgan("dev"));
