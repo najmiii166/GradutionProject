@@ -6,7 +6,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
-import httpProxy from "http-proxy";
 
 import { connectDB } from "./config/db.js";
 import socketAuth from "./middleware/socketAuth.js";
@@ -33,49 +32,40 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 /* ===============================
-   ALLOWED ORIGINS
+   ALLOWED ORIGINS (RAILWAY FIX)
 ================================ */
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://graduation-project-eight.vercel.app",
-  // ✅ Domain-ka cusub ee cilada ku siiyay ku daray halkan:
   "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
-  "https://graduation-project-jixjwsqsm-najmiii166s-projects.vercel.app",
+  "https://gradution-project-najmiii166s-projects.vercel.app" // Vercel main link
 ];
 
-/* ===============================
-   CORS CONFIGURATION (SAX AH)
-================================ */
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    // Ogolaansho sii haddii uu ku jiro liiska ama uu yahay vercel subdomain
+    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// Handle Preflight (OPTIONS)
-app.options("*", cors());
+app.options("*", cors()); // Enable pre-flight for all routes
 
 app.use(express.json());
 app.use(morgan("dev"));
 
-/* ===============================
-   STATIC FILES
-================================ */
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
-/* ===============================
-   ROUTES
-================================ */
+// ROUTES
 app.use("/api", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
@@ -89,100 +79,37 @@ app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
 
-app.get("/", (_, res) => res.send("MentorLink API Running 🚀"));
+app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
-/* ===============================
-   SOCKET.IO
-================================ */
 const server = http.createServer(app);
-
-// Trust proxy when deployed behind Vercel/Railway
 app.set("trust proxy", true);
 
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["polling", "websocket"],
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
+  cors: { origin: allowedOrigins, credentials: true }
 });
 
-app.set("io", io);
-
-// Auth middleware for socket connections
 io.use(socketAuth);
 
 io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
-
   const userId = socket.user?._id;
   if (userId) socket.join(userId.toString());
-
-  socket.on("join_conversation", ({ conversationId }) => {
-    socket.join(conversationId);
-  });
-
-  socket.on("message:edit", async ({ messageId, text }) => {
-    if (!messageId || !text) return;
-    const msg = await Message.findById(messageId);
-    if (!msg || String(msg.sender) !== String(socket.user.id)) return;
-    msg.text = text;
-    msg.edited = true;
-    await msg.save();
-    io.to(msg.conversation.toString()).emit("message:updated", msg);
-  });
-
-  socket.on("message:delete", async ({ messageId }) => {
-    if (!messageId) return;
-    const msg = await Message.findById(messageId);
-    if (!msg) return;
-    msg.deleted = true;
-    msg.text = "";
-    await msg.save();
-    io.to(msg.conversation.toString()).emit("message:deleted", {
-      _id: msg._id,
-      conversationId: msg.conversation,
-    });
-  });
-
-  socket.on("disconnect", () => {
-    console.log("❌ Socket Disconnected:", socket.id);
-  });
+  
+  socket.on("disconnect", () => console.log("❌ Socket Disconnected"));
 });
 
 /* ===============================
-   VITE PROXY (LOCAL ONLY)
+   START SERVER (RAILWAY PORT FIX)
 ================================ */
-if (process.env.NODE_ENV !== "production") {
-  const viteProxy = httpProxy.createProxyServer({
-    target: "http://localhost:5174",
-    ws: true,
-    changeOrigin: true,
-  });
-
-  app.use((req, res, next) => {
-    const url = req.url || "";
-    if (url.startsWith("/api") || url.startsWith("/uploads") || url.startsWith("/socket.io"))
-      return next();
-
-    viteProxy.web(req, res, (err) => {
-      console.error("Proxy Error:", err?.message);
-      res.status(502).end("Proxy Failed");
-    });
-  });
-}
-
-/* ===============================
-   START SERVER
-================================ */
-const PORT = process.env.PORT || 5000;
+// Railway wuxuu u baahan yahay 0.0.0.0 si uu dibadda u aqbalo requests
+const PORT = process.env.PORT || 8080;
 
 connectDB()
   .then(() => {
     ensureAdminExists();
-    server.listen(PORT, () =>
+    server.listen(PORT, "0.0.0.0", () =>
       console.log(`🚀 Server running on port ${PORT}`)
     );
   })
