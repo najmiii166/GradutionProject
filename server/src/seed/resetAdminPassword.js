@@ -36,7 +36,6 @@ const newPassword = process.env.ADMIN_PASSWORD || process.argv[3] || "Admin123!"
 
     console.log("✅ Admin user created successfully!");
     console.log("Email:", email);
-    console.log("Password:", newPassword);
     process.exit(0);
   } catch (err) {
     console.error("❌ Error:", err);
