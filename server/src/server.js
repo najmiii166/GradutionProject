@@ -57,11 +57,14 @@ console.log("Allowed Origins =>", allowedOrigins);
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        cb(null, true);
-      } else {
-        cb(new Error("Not allowed by CORS"));
-      }
+      const allowed = !origin || allowedOrigins.includes(origin);
+      console.log(
+        `CORS check - origin: ${origin || "<<no origin>>"} -> ${
+          allowed ? "ALLOWED" : "DENIED"
+        }`
+      );
+      if (allowed) cb(null, true);
+      else cb(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
@@ -106,6 +109,20 @@ const io = new Server(server, {
 });
 
 app.set("io", io);
+
+// Log socket handshake origin and enforce allowedOrigins for debugging
+io.use((socket, next) => {
+  const origin = socket.handshake.headers.origin;
+  const allowed = !origin || allowedOrigins.includes(origin);
+  console.log(
+    `Socket CORS check - origin: ${origin || "<<no origin>>"} -> ${
+      allowed ? "ALLOWED" : "DENIED"
+    }`
+  );
+  if (!allowed) return next(new Error("Not allowed by CORS"));
+  next();
+});
+
 io.use(socketAuth);
 
 io.on("connection", (socket) => {
