@@ -1,4 +1,3 @@
-// server/src/server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -34,54 +33,37 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 /* ===============================
-   ALLOWED ORIGINS (SAX AH)
+   ALLOWED ORIGINS
 ================================ */
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
-
-  // ✅ Vercel (production)
   "https://graduation-project-eight.vercel.app",
-
-  // optional preview domains (waa OK in la reebo)
-  "https://graduation-project-git-main-najmiii166s-projects.vercel.app",
+  // ✅ Domain-ka cusub ee cilada ku siiyay ku daray halkan:
+  "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
   "https://graduation-project-jixjwsqsm-najmiii166s-projects.vercel.app",
 ];
 
-console.log("Allowed Origins =>", allowedOrigins);
-
 /* ===============================
-   CORS
+   CORS CONFIGURATION (SAX AH)
 ================================ */
-/* ===============================
-   CORS (manual robust handler to ensure preflight works)
-================================ */
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
-  // Allow server-to-server/curl requests without origin
-  if (!origin || allowedOrigins.includes(origin)) {
-    if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
-    else res.setHeader("Access-Control-Allow-Origin", "*");
-
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type,Authorization"
-    );
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-  } else {
-    console.error("❌ CORS blocked origin:", origin);
-  }
-
-  // Handle preflight
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-
-  next();
-});
+// Handle Preflight (OPTIONS)
+app.options("*", cors());
 
 app.use(express.json());
 app.use(morgan("dev"));
@@ -117,29 +99,17 @@ const server = http.createServer(app);
 // Trust proxy when deployed behind Vercel/Railway
 app.set("trust proxy", true);
 
-// Create Socket.IO server with explicit path and transports
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["polling", "websocket"],
   cors: {
-    origin: (origin, cb) => {
-      const allowed = !origin || allowedOrigins.includes(origin);
-      cb(null, allowed);
-    },
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
 app.set("io", io);
-
-// Log and enforce socket handshake origin
-io.use((socket, next) => {
-  const origin = socket.handshake.headers.origin;
-  const allowed = !origin || allowedOrigins.includes(origin);
-  console.log(`Socket CORS check - origin: ${origin || "<<no origin>>"} -> ${allowed ? "ALLOWED" : "DENIED"}`);
-  if (!allowed) return next(new Error("Not allowed by CORS"));
-  next();
-});
 
 // Auth middleware for socket connections
 io.use(socketAuth);
@@ -148,7 +118,7 @@ io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
 
   const userId = socket.user?._id;
-  if (userId) socket.join(userId);
+  if (userId) socket.join(userId.toString());
 
   socket.on("join_conversation", ({ conversationId }) => {
     socket.join(conversationId);
@@ -156,28 +126,21 @@ io.on("connection", (socket) => {
 
   socket.on("message:edit", async ({ messageId, text }) => {
     if (!messageId || !text) return;
-
     const msg = await Message.findById(messageId);
-    if (!msg) return;
-    if (String(msg.sender) !== String(socket.user.id)) return;
-
+    if (!msg || String(msg.sender) !== String(socket.user.id)) return;
     msg.text = text;
     msg.edited = true;
     await msg.save();
-
     io.to(msg.conversation.toString()).emit("message:updated", msg);
   });
 
   socket.on("message:delete", async ({ messageId }) => {
     if (!messageId) return;
-
     const msg = await Message.findById(messageId);
     if (!msg) return;
-
     msg.deleted = true;
     msg.text = "";
     await msg.save();
-
     io.to(msg.conversation.toString()).emit("message:deleted", {
       _id: msg._id,
       conversationId: msg.conversation,
@@ -201,11 +164,7 @@ if (process.env.NODE_ENV !== "production") {
 
   app.use((req, res, next) => {
     const url = req.url || "";
-    if (
-      url.startsWith("/api") ||
-      url.startsWith("/uploads") ||
-      url.startsWith("/socket.io")
-    )
+    if (url.startsWith("/api") || url.startsWith("/uploads") || url.startsWith("/socket.io"))
       return next();
 
     viteProxy.web(req, res, (err) => {
