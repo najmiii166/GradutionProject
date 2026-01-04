@@ -2,21 +2,23 @@
 import { io } from "socket.io-client";
 import { API_URL } from "./api/axios";
 
-// Convert API URL like "http://host:port/api" or with trailing slash
-// into socket base URL (strip trailing `/api` or `/api/`)
+// Strip trailing /api if present
 const SOCKET_URL = API_URL.replace(/\/api\/?$/i, "");
 
 export function createSocket() {
   const token = localStorage.getItem("token");
 
-  // Allow polling as a fallback transport so the client can connect even if
-  // a direct websocket handshake fails (proxies, dev-proxy misconfig, etc.)
   const socket = io(SOCKET_URL, {
-    // prefer websocket but allow polling fallback
-    transports: ["websocket", "polling"],
-    auth: { token },
+    // 🔥 MUHIIM: polling FIRST, websocket SECOND
+    transports: ["polling", "websocket"],
+
+    // auth token for socketAuth middleware
+    auth: token ? { token } : {},
+
+    withCredentials: true,
+
     reconnection: true,
-    reconnectionAttempts: 20,
+    reconnectionAttempts: 10,
     reconnectionDelay: 500,
   });
 
@@ -24,22 +26,12 @@ export function createSocket() {
     console.log("🔌 Socket Connected:", socket.id);
   });
 
-  socket.on("disconnect", () => {
-    console.log("❌ Socket Disconnected");
+  socket.on("disconnect", (reason) => {
+    console.log("❌ Socket Disconnected:", reason);
   });
 
   socket.on("connect_error", (err) => {
-    // Log full error for debugging (may include transport and server response)
-    try {
-      console.error("⚠️ Socket connect_error:", err);
-    } catch (e) {
-      console.log("⚠️ Socket connect_error (string):", String(err));
-    }
-  });
-
-  // Optional: log upgrade attempts and transport changes
-  socket.io.on("upgrade", (transport) => {
-    console.log("Socket transport upgraded to:", transport.name);
+    console.error("⚠️ Socket connect_error:", err.message || err);
   });
 
   return socket;
