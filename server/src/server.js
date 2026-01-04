@@ -33,23 +33,27 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-/* =====================================================
-   ALLOWED ORIGINS (LOCAL + VERCEL + RAILWAY)
-===================================================== */
+/* ===============================
+   ALLOWED ORIGINS (SAX AH)
+================================ */
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
 
-  // Vercel
-  "https://gradution-project-eight.vercel.app",
+  // Vercel FRONTEND (SAX)
+  "https://graduation-project-eight.vercel.app",
+  "https://graduation-project-git-main-najmiii166s-projects.vercel.app",
+  "https://graduation-project-jixjwsqsm-najmiii166s-projects.vercel.app",
 
-  // Railway (ku beddel marka domain-kaaga rasmiga ah yimaado)
-  "https://mentorlink-production.up.railway.app",
+  // Railway BACKEND (PUBLIC)
+  "https://graduationproject-production.up.railway.app",
 ];
 
-/* =====================================================
+console.log("Allowed Origins =>", allowedOrigins);
+
+/* ===============================
    CORS
-===================================================== */
+================================ */
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -63,20 +67,17 @@ app.use(
   })
 );
 
-/* =====================================================
-   MIDDLEWARE
-===================================================== */
 app.use(express.json());
 app.use(morgan("dev"));
 
-/* =====================================================
+/* ===============================
    STATIC FILES
-===================================================== */
+================================ */
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
-/* =====================================================
+/* ===============================
    ROUTES
-===================================================== */
+================================ */
 app.use("/api", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
@@ -92,9 +93,9 @@ app.use("/api/enrollments", enrollmentsRoutes);
 
 app.get("/", (_, res) => res.send("MentorLink API Running 🚀"));
 
-/* =====================================================
-   HTTP + SOCKET.IO
-===================================================== */
+/* ===============================
+   SOCKET.IO
+================================ */
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -107,9 +108,6 @@ const io = new Server(server, {
 app.set("io", io);
 io.use(socketAuth);
 
-/* =====================================================
-   SOCKET EVENTS
-===================================================== */
 io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
 
@@ -155,9 +153,9 @@ io.on("connection", (socket) => {
   });
 });
 
-/* =====================================================
-   VITE DEV PROXY (LOCAL ONLY)
-===================================================== */
+/* ===============================
+   VITE PROXY (LOCAL ONLY)
+================================ */
 if (process.env.NODE_ENV !== "production") {
   const viteProxy = httpProxy.createProxyServer({
     target: "http://localhost:5174",
@@ -181,9 +179,9 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-/* =====================================================
+/* ===============================
    START SERVER
-===================================================== */
+================================ */
 const PORT = process.env.PORT || 5000;
 
 connectDB()
@@ -194,6 +192,6 @@ connectDB()
     );
   })
   .catch((err) => {
-    console.error("❌ DB connection failed:", err);
+    console.error("❌ DB Error:", err);
     process.exit(1);
   });
