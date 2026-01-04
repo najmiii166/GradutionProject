@@ -2,15 +2,26 @@
 import { io } from "socket.io-client";
 import { API_URL } from "./api/axios";
 
-// Strip trailing /api if present
-const SOCKET_URL = API_URL.replace(/\/api\/?$/i, "");
+// Determine socket URL: prefer same-origin (empty string) when the API host differs
+let SOCKET_URL = API_URL.replace(/\/api\/?$/i, "");
+try {
+  if (typeof window !== "undefined") {
+    const apiHost = new URL(API_URL).hostname;
+    if (window.location.hostname !== apiHost) {
+      // connect to same origin (will route through Vercel proxy)
+      SOCKET_URL = "";
+    }
+  }
+} catch (err) {
+  // fallback: keep SOCKET_URL as-is
+}
 
 export function createSocket() {
   const token = localStorage.getItem("token");
 
   const socket = io(SOCKET_URL, {
-    // 🔥 MUHIIM: polling FIRST, websocket SECOND
-    transports: ["polling", "websocket"],
+    // If connecting via proxy (same-origin), force polling only to avoid websocket upgrades
+    transports: SOCKET_URL === "" ? ["polling"] : ["polling", "websocket"],
 
     // auth token for socketAuth middleware
     auth: token ? { token } : {},
