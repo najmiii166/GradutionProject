@@ -29,7 +29,7 @@ export const ensureAdminExists = async () => {
       setDefaultsOnInsert: true,
     });
 
-    console.log(`🌱 Admin ensured: ${email}`);
+    
   } catch (err) {
     console.error("❌ Error ensuring admin user exists:", err);
   }

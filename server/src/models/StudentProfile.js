@@ -1,3 +1,4 @@
+// server/src/models/StudentProfile.js
 import mongoose from "mongoose";
 
 const StudentProfileSchema = new mongoose.Schema(

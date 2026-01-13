@@ -1,3 +1,4 @@
+// server/src/server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -10,6 +11,8 @@ import { Server } from "socket.io";
 import { connectDB } from "./config/db.js";
 import socketAuth from "./middleware/socketAuth.js";
 import { ensureAdminExists } from "./seed/seedAdmin.js";
+import { finalizeSessionsJob } from "./jobs/finalizeSessions.job.js";
+
 import Message from "./models/Message.js";
 
 // ROUTES
@@ -25,6 +28,7 @@ import reportsRoutes from "./routes/reports.routes.js";
 import supportRoutes from "./routes/support.routes.js";
 import adminTicketsRoutes from "./routes/admin.tickets.js";
 import enrollmentsRoutes from "./routes/enrollments.routes.js";
+import sessionsRoutes from "./routes/sessions.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +82,10 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
+app.use("/api/sessions", sessionsRoutes);
+
+
+// HEALTH CHECK
 
 app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
@@ -89,6 +97,8 @@ const io = new Server(server, {
   transports: ["polling", "websocket"],
   cors: { origin: allowedOrigins, credentials: true }
 });
+
+app.set("io", io);
 
 io.use(socketAuth);
 
@@ -109,10 +119,18 @@ const PORT = process.env.PORT || 8080;
 connectDB()
   .then(() => {
     ensureAdminExists();
+
+    // 🔁 Run once immediately on startup
+    finalizeSessionsJob();
+
+    // 🔁 Then every 1 minute
+    setInterval(finalizeSessionsJob, 60 * 1000);
+
     server.listen(PORT, "0.0.0.0", () =>
       console.log(`🚀 Server running on port ${PORT}`)
     );
   })
+
   .catch((err) => {
     console.error("❌ DB Error:", err);
     process.exit(1);
