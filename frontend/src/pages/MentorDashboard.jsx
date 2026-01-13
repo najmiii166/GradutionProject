@@ -1,5 +1,6 @@
 // src/pages/MentorDashboard.jsx
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { api, setAuthToken } from "../api/axios";
@@ -101,6 +102,8 @@ export default function MentorDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
 
+  const [externalOpenRequest, setExternalOpenRequest] = useState(null);
+
   const notifBtnRef = useRef(null);
   const notifRef = useRef(null);
 
@@ -136,7 +139,58 @@ export default function MentorDashboard() {
     const handler = (e) => {
       try {
         const payload = e.detail;
-        setNotifications((prev) => [payload, ...prev]);
+        if (!payload) return;
+
+        // Normalize and dedupe request:created notifications
+        if (payload.type === "request:created") {
+          const r = payload.request || {};
+          const normalized = {
+            type: "request:created",
+            request: {
+              _id: r._id,
+              studentId: r.studentId,
+              studentName: r.studentName,
+              requestedAt: r.requestedAt,
+              slot: r.slot,
+            },
+          };
+
+          setNotifications((prev) => {
+            const id = normalized.request._id;
+            if (
+              id &&
+              prev.some(
+                (n) =>
+                  n.type === "request:created" &&
+                  n.request &&
+                  n.request._id &&
+                  String(n.request._id) === String(id)
+              )
+            ) {
+              return prev;
+            }
+
+            return [normalized, ...prev];
+          });
+
+          return;
+        }
+
+        // Fallback: push other notifications (dedupe if possible)
+        setNotifications((prev) => {
+          const id = payload.request?._id || payload.message?.id;
+          if (
+            id &&
+            prev.some((n) =>
+              (n.request && n.request._id && String(n.request._id) === String(id)) ||
+              (n.message && n.message.id && n.message.id === id)
+            )
+          ) {
+            return prev;
+          }
+
+          return [payload, ...prev];
+        });
       } catch (err) {
         console.error("socket notification handler error:", err);
       }
@@ -351,7 +405,25 @@ export default function MentorDashboard() {
                 activeTab === 'support' ? 'text-sky-400' : 'text-slate-300 hover:text-sky-400'
               }`}
             />
-          </button>
+          </button> 
+
+          {/* HISTORY */}
+<button
+  onClick={() => {
+    setActiveTab("history");
+    navigate("/history");
+  }}
+  className="transition"
+>
+  <Clock
+    className={`w-6 h-6 ${
+      activeTab === "history"
+        ? "text-sky-400"
+        : "text-slate-300 hover:text-sky-400"
+    }`}
+  />
+</button>
+
         </div>
 
         {/* SETTINGS BOTTOM */}
@@ -408,13 +480,13 @@ export default function MentorDashboard() {
             </div>
           </button>
 
-          {showNotifications && (
+          {showNotifications && createPortal(
             <div
               ref={notifRef}
               id="mentor-notifications"
               role="dialog"
               aria-label="Notifications"
-              className="fixed right-6 top-20 w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 space-y-3 z-50 backdrop-blur-sm"
+              className="fixed right-6 top-20 w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 space-y-3 z-[9999] backdrop-blur-sm"
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">Notifications</h3>
@@ -432,47 +504,51 @@ export default function MentorDashboard() {
 
               {notifications.length > 0 && (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {notifications.map((n, idx) => (
-                    <div key={`n-${idx}-${n.type}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-2">
-                      <div className="flex items-center justify-between text-sm text-slate-200">
-                        <span className="font-semibold">{n.type}</span>
-                        <span className="text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{n.request?.note || n.message?.text || JSON.stringify(n.request?.slot || n.message?.type || '')}</p>
-                      <div className="mt-2 flex items-center justify-end gap-2">
-                        {n.request && (
-                          <>
-                            <button
-                              onClick={() => openStudentProfile(n.request.studentId)}
-                              className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => { handleRequestAction(n.request._id, 'accept'); setNotifications((prev) => prev.filter((x) => x !== n)); }}
-                              className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
-                            >
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => { handleRequestAction(n.request._id, 'reject'); setNotifications((prev) => prev.filter((x) => x !== n)); }}
-                              className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {n.message && (
-                          <button
-                            onClick={() => { navigate(`/chat/${n.conversationId}`); setNotifications((prev) => prev.filter((x) => x !== n)); }}
-                            className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                          >
-                            Open Chat
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                      {notifications.map((n, idx) => {
+                        const t = n.type;
+                        const req = n.request || {};
+                        const isCreated = t === "request:created";
+                        const dateStr = req.requestedAt ? new Date(req.requestedAt).toLocaleDateString() : new Date().toLocaleDateString();
+                        const slot = req.slot || {};
+                        const slotText = slot.day ? `${slot.day} ${slot.from || ''}–${slot.to || ''}` : `${slot.from || ''}–${slot.to || ''}`;
+                        const title = isCreated ? "Mentor Request" : (t || "Notification");
+                        const info = isCreated ? `${req.studentName || 'Student'} • ${slotText}` : (req.note || n.message?.text || JSON.stringify(req.slot || n.message?.type || ''));
+                        const accent = isCreated ? "text-sky-400" : "text-amber-400";
+
+                        return (
+                          <div key={`n-${idx}-${t}-${req._id || idx}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-2">
+                            <div className="flex items-center justify-between text-sm text-slate-200">
+                              <span className={`font-semibold ${accent}`}>{title}</span>
+                              <span className="text-xs text-slate-400">{dateStr}</span>
+                            </div>
+
+                            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{info}</p>
+
+                            <div className="mt-2 flex items-center justify-end gap-2">
+                              {n.request && (
+                                <button
+                                  onClick={() => {
+                                    setExternalOpenRequest(req);
+                                    setShowNotifications(false);
+                                  }}
+                                  className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                                >
+                                  View Details
+                                </button>
+                              )}
+
+                              {n.message && (
+                                <button
+                                  onClick={() => { navigate(`/chat/${n.conversationId}`); setNotifications((prev) => prev.filter((x) => x !== n)); }}
+                                  className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                                >
+                                  Open Chat
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                 </div>
               )}
 
@@ -484,39 +560,33 @@ export default function MentorDashboard() {
                       className="rounded-lg border border-slate-800 bg-slate-900/70 p-2"
                     >
                       <div className="flex items-center justify-between text-sm text-slate-200">
-                        <span className="font-semibold">{r.studentName || "Student"}</span>
+                        <span className="font-semibold text-sky-400">Mentor Request</span>
                         <span className="text-xs text-slate-400">
                           {new Date(r.requestedAt || Date.now()).toLocaleDateString()}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                        {r.note || "New mentorship request"}
+                        {r.studentName || "Student"} • {r.slot?.day || ''} {r.slot?.from || ''}–{r.slot?.to || ''}
                       </p>
                       <div className="mt-2 flex items-center justify-end gap-2">
                         <button
-                          onClick={() => openStudentProfile(r.studentId)}
+                          onClick={() => {
+                            setExternalOpenRequest(r);
+                            setShowNotifications(false);
+                          }}
                           className="text-xs px-2 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
                         >
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleRequestAction(r._id, "accept")}
-                          className="text-xs px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleRequestAction(r._id, "reject")}
-                          className="text-xs px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-500"
-                        >
-                          Reject
+                          View Details
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+
+
+            </div>,
+            document.body
           )}
         </div>
       </nav>
@@ -559,6 +629,7 @@ export default function MentorDashboard() {
               requests={requests}
               onAction={handleRequestAction}
               onViewStudent={openStudentProfile}
+              externalOpenRequest={externalOpenRequest}
             />
           </div>
 

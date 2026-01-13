@@ -1,9 +1,12 @@
+// server/src/routes/request.route.js
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import Request from "../models/Request.js";
 import MentorProfile from "../models/MentorProfile.js";
 import User from "../models/User.js";
 import StudentProfile from "../models/StudentProfile.js";
+import { finalizeSession } from "../utils/finalizeSession.js";
+
 
 const router = express.Router();
 
@@ -17,7 +20,8 @@ router.post("/", auth, async (req, res) => {
     }
 
     const studentId = req.user.id;
-    const { mentorId, slot } = req.body;
+    const { mentorId, slot, questionnaire } = req.body;
+
 
     if (!mentorId || !slot) {
       return res.status(400).json({ message: "Missing mentor or slot." });
@@ -27,7 +31,7 @@ router.post("/", auth, async (req, res) => {
     const exists = await Request.findOne({
       studentId,
       mentorId,
-      status: { $in: ["pending", "upcoming"] },
+      status: { $in: ["pending", "upcoming", "ongoing"] },
     });
 
     if (exists) {
@@ -40,6 +44,7 @@ router.post("/", auth, async (req, res) => {
       studentId,
       mentorId,
       slot,
+      questionnaire,
       status: "pending",
       requestedAt: new Date(),
     });
@@ -101,12 +106,31 @@ router.get("/student", auth, async (req, res) => {
       .sort({ requestedAt: -1 })
       .lean();
 
-    res.json(requests);
+    const updates = [];
+
+    const finalized = requests.map((r) => {
+      const newStatus = finalizeSession(r);
+
+      if (newStatus !== r.status) {
+        updates.push({ id: r._id, status: newStatus });
+        return { ...r, status: newStatus };
+      }
+
+      return r;
+    });
+
+    // persist changes
+    for (const u of updates) {
+      await Request.findByIdAndUpdate(u.id, { status: u.status });
+    }
+
+    res.json(finalized);
   } catch (err) {
     console.error("GET STUDENT REQUESTS ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 /* ============================
    GET MENTOR REQUESTS
@@ -137,9 +161,9 @@ router.get("/mentor", auth, async (req, res) => {
       const sp = await StudentProfile.findOne({ user: r.studentId._id }).lean();
       r.studentName = r.studentId.fullName;
       r.studentUniversity = r.studentId.university;
-      r.major = sp?.major || "";
-      r.semester = sp?.semester || "";
-      r.note = sp?.about || "";
+      r.studentId.faculty = sp?.faculty || "—";
+  r.studentId.major = sp?.major || "—";
+  r.studentId.semester = sp?.semester || "—";
     }
 
     res.json(requests);
@@ -172,8 +196,55 @@ router.patch("/mentor/:id", auth, async (req, res) => {
     }
 
     if (action === "accept") {
-      request.status = "upcoming";
-    } else if (action === "reject") {
+  const { day, from, to } = request.slot;
+
+  const dayMap = {
+    sunday: 0, monday: 1, tuesday: 2,
+    wednesday: 3, thursday: 4,
+    friday: 5, saturday: 6,
+  };
+
+  const now = new Date();
+  const targetDay = dayMap[day.toLowerCase()];
+  if (targetDay === undefined) {
+    return res.status(400).json({ message: "Invalid day" });
+  }
+
+const nextDate = new Date(now);
+const dayDiff = (targetDay - now.getDay() + 7) % 7;
+
+// Same day → check time
+if (dayDiff === 0) {
+  const [fromH, fromM] = from.split(":");
+  const slotStartToday = new Date(now);
+  slotStartToday.setHours(fromH, fromM, 0, 0);
+
+  // If slot time already passed → next week
+  if (slotStartToday <= now) {
+    nextDate.setDate(now.getDate() + 7);
+  }
+  // else: keep today
+} else {
+  nextDate.setDate(now.getDate() + dayDiff);
+}
+
+
+  const [fromH, fromM] = from.split(":");
+  const [toH, toM] = to.split(":");
+
+  const startTime = new Date(nextDate);
+  startTime.setHours(fromH, fromM, 0, 0);
+
+  const endTime = new Date(nextDate);
+  endTime.setHours(toH, toM, 0, 0);
+
+  request.startTime = startTime;
+  request.endTime = endTime;
+  request.status = "upcoming";
+
+}
+
+     else if (action === "reject") {
       request.status = "rejected";
     } else {
       return res.status(400).json({ message: "Invalid action." });
@@ -181,26 +252,36 @@ router.patch("/mentor/:id", auth, async (req, res) => {
 
     await request.save();
     // Notify the student about the decision
-    try {
-      const io = req.app.get("io");
-      if (io) {
-        const studentId = request.studentId;
-        const payload = {
-          _id: request._id,
-          mentorId: mentorProfile?._id,
-          mentorUserId: mentorProfile?.user?._id,
-          mentorName: mentorProfile?.user?.fullName || "Mentor",
-          status: request.status,
-          requestedAt: request.requestedAt,
-        };
-        io.to(String(studentId)).emit("notification", {
-          type: `request:${action}`,
-          request: payload,
-        });
-      }
-    } catch (err) {
-      console.error("Failed to emit socket notification (request:action):", err);
-    }
+try {
+  const io = req.app.get("io");
+  if (io) {
+    const studentId = request.studentId;
+
+    const mentorUser = await User.findById(mentorProfile.user)
+      .select("fullName")
+      .lean();
+
+    const payload = {
+      _id: request._id,
+      status: request.status, // "upcoming" or "rejected"
+      mentorName: mentorUser?.fullName || "Mentor",
+      slot: request.slot,
+      startTime: request.startTime,
+      endTime: request.endTime,
+      requestedAt: request.requestedAt,
+    };
+
+    io.to(String(studentId)).emit("notification", {
+      type: request.status === "upcoming"
+        ? "request:accepted"
+        : "request:rejected",
+      request: payload,
+    }); 
+  }
+} catch (err) {
+  console.error("Failed to emit socket notification:", err);
+}
+
 
     res.json({ message: `Request ${action}ed successfully`, request });
   } catch (err) {
@@ -223,7 +304,7 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
 
     const sessions = await Request.find({
       mentorId: mentorProfile._id,
-      status: "upcoming",
+      status: { $in: ["upcoming", "ongoing"] },
     })
       .populate({
         path: "studentId",
@@ -233,17 +314,36 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
       .sort({ requestedAt: -1 })
       .lean();
 
-    const formatted = sessions.map((s) => ({
-      _id: s._id,
-      studentId: s.studentId._id,
-      studentName: s.studentId.fullName,
-      studentUniversity: s.studentId.university,
-      dayOfWeek: s.slot?.day || "",
-      from: s.slot?.from || "",
-      to: s.slot?.to || "",
-      status: s.status,
-      requestedAt: s.requestedAt,
-    }));
+   const updates = [];
+
+    const formatted = sessions.map((s) => {
+      const newStatus = finalizeSession(s);
+
+      if (newStatus !== s.status) {
+        updates.push({ id: s._id, status: newStatus });
+      }
+
+      return {
+        _id: s._id,
+        studentId: s.studentId._id,
+        studentName: s.studentId.fullName,
+        studentUniversity: s.studentId.university,
+        dayOfWeek: s.slot?.day || "",
+        from: s.slot?.from || "",
+        to: s.slot?.to || "",
+        status: newStatus,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        meetingLink: s.meetingLink || "",
+        requestedAt: s.requestedAt,
+      };
+    });
+
+    // ✅ persist status changes safely
+    for (const u of updates) {
+      await Request.findByIdAndUpdate(u.id, { status: u.status });
+    }
+
 
     res.json(formatted);
   } catch (err) {
@@ -251,6 +351,57 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// POST /api/requests/:id/join
+router.post("/:id/join", auth, async (req, res) => {
+  const request = await Request.findById(req.params.id);
+  if (!request) return res.sendStatus(404);
+
+  if (req.user.role === "mentor") request.mentorJoined = true;
+  if (req.user.role === "student") request.studentJoined = true;
+
+  await request.save();
+
+  // notify both via socket
+  const io = req.app.get("io");
+  io.to(String(request.studentId)).emit("session:update", request._id);
+  io.to(String(request.mentorId)).emit("session:update", request._id);
+
+  res.json({ success: true });
+});
+
+
+// PATCH /api/requests/mentor/:id/meeting-link
+router.patch("/mentor/:id/meeting-link", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "mentor") {
+      return res.status(403).json({ message: "Only mentors allowed" });
+    }
+
+    const { meetingLink } = req.body;
+
+    if (
+      !meetingLink ||
+      !/^https:\/\/meet\.google\.com\/[a-z-]+$/i.test(meetingLink)
+    ) {
+      return res.status(400).json({ message: "Invalid Google Meet link" });
+    }
+
+    const request = await Request.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    request.meetingLink = meetingLink;
+    await request.save();
+
+    res.json({ success: true, meetingLink });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to save meeting link" });
+  }
+});
+
 
 /* ============================
    DELETE / CANCEL OR REMOVE REQUEST
