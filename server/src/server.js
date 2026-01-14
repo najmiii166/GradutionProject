@@ -103,6 +103,14 @@ app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
 app.use("/api/sessions", sessionsRoutes);
 
+// Debug route: returns the request Origin and whether it's allowed by CORS.
+// Useful for remote debugging when browser shows CORS errors.
+app.get("/api/_debug/origin", (req, res) => {
+  const origin = req.get("origin") || null;
+  console.log("[DEBUG] Incoming Origin:", origin);
+  return res.json({ origin, allowed: isOriginAllowed(origin) });
+});
+
 // HEALTH CHECK
 app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
