@@ -39,25 +39,41 @@ app.set("trust proxy", true);
 /* ===============================
    ALLOWED ORIGINS (CORS FIX)
 ================================ */
+const FRONTEND_URL = process.env.FRONTEND_URL;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://graduation-project-eight.vercel.app",
   "https://graduation-project-jade.vercel.app", // ✅ YOUR NEW LIVE VERCEL DOMAIN
   "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
-  "https://gradution-project-najmiii166s-projects.vercel.app",
+  "https://graduation-project-najmiii166s-projects.vercel.app",
+  // allow explicit FRONTEND_URL from env if configured
+  ...(FRONTEND_URL ? [FRONTEND_URL] : []),
 ];
 
 // Same rule for HTTP + Socket
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Postman / server-to-server
-  return allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+  try {
+    if (allowedOrigins.includes(origin)) return true;
+    if (origin.endsWith(".vercel.app")) return true;
+    // catch other common hosting patterns
+    if (origin.includes("vercel.app") || origin.includes("railway.app")) return true;
+  } catch (e) {
+    return false;
+  }
+  return false;
 };
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // IMPORTANT: do NOT pass an Error to the callback here — that can prevent
+    // CORS headers from being sent and lead to the browser reporting
+    // "No 'Access-Control-Allow-Origin' header is present". Return a boolean
+    // instead so the middleware can handle responses normally.
     if (isOriginAllowed(origin)) return callback(null, true);
-    return callback(new Error("Not allowed by CORS: " + origin));
+    console.warn("Blocked CORS origin:", origin);
+    return callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
