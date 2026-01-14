@@ -34,35 +34,38 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set("trust proxy", true);
 
 /* ===============================
-   ALLOWED ORIGINS (RAILWAY FIX)
+   ALLOWED ORIGINS (CORS FIX)
 ================================ */
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://graduation-project-eight.vercel.app",
+  "https://graduation-project-jade.vercel.app", // ✅ YOUR NEW LIVE VERCEL DOMAIN
   "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
-  "https://gradution-project-najmiii166s-projects.vercel.app" // Vercel main link
+  "https://gradution-project-najmiii166s-projects.vercel.app",
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    // Ogolaansho sii haddii uu ku jiro liiska ama uu yahay vercel subdomain
-    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+// Same rule for HTTP + Socket
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Postman / server-to-server
+  return allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+};
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS: " + origin));
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-app.options("*", cors()); // Enable pre-flight for all routes
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // ✅ IMPORTANT: preflight uses SAME options
 
 app.use(express.json());
 app.use(morgan("dev"));
@@ -84,18 +87,21 @@ app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
 app.use("/api/sessions", sessionsRoutes);
 
-
 // HEALTH CHECK
-
 app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
 const server = http.createServer(app);
-app.set("trust proxy", true);
 
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["polling", "websocket"],
-  cors: { origin: allowedOrigins, credentials: true }
+  cors: {
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS (socket): " + origin));
+    },
+    credentials: true,
+  },
 });
 
 app.set("io", io);
@@ -106,14 +112,13 @@ io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
   const userId = socket.user?._id;
   if (userId) socket.join(userId.toString());
-  
+
   socket.on("disconnect", () => console.log("❌ Socket Disconnected"));
 });
 
 /* ===============================
    START SERVER (RAILWAY PORT FIX)
 ================================ */
-// Railway wuxuu u baahan yahay 0.0.0.0 si uu dibadda u aqbalo requests
 const PORT = process.env.PORT || 8080;
 
 connectDB()
@@ -130,7 +135,6 @@ connectDB()
       console.log(`🚀 Server running on port ${PORT}`)
     );
   })
-
   .catch((err) => {
     console.error("❌ DB Error:", err);
     process.exit(1);
