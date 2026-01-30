@@ -1,142 +1,242 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, useAnimation, useInView } from "framer-motion";
+import { motion, useAnimation, useInView, useScroll, useTransform } from "framer-motion";
 import {
-  CalendarClock,
-  ShieldCheck,
-  BarChart3,
-  Sparkles,
   ArrowRight,
+  ShieldCheck,
+  Search,
+  ClipboardList,
+  MessageSquare,
+  Video,
+  CheckCircle,
   Star,
   Building2,
-  CheckCircle2,
-  UserCheck,
-  Link2,
+  ChevronDown,
+  BellRing,
+  FileText,
+  Clock
 } from "lucide-react";
 import Brand from "../components/Brand";
-import Button from "../components/Button";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function Landing() {
   const [showModal, setShowModal] = useState(false);
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: containerRef });
+  
+  // Subtle parallax for the hero section
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-white overflow-x-hidden">
-      {/* ==== Animated background with depth ==== */}
-      <div className="absolute inset-0 -z-10">
-        <motion.div
-          className="absolute -top-32 -left-32 h-[400px] w-[400px] bg-sky-500/25 blur-[160px] rounded-full"
-          animate={{ y: [0, 40, 0] }}
-          transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+    <div ref={containerRef} className="relative min-h-screen bg-background text-foreground selection:bg-cyan-500/30">
+  {/* ==== MINIMALIST BACKGROUND ART ==== */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        
+        {/* 1. Animated Floating Orbs - Increased Opacity */}
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            x: [0, 30, 0],
+            y: [0, 40, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-5%] left-[-5%] w-[500px] h-[500px] bg-cyan-500/[0.12] dark:bg-cyan-500/[0.15] blur-[100px] rounded-full" 
         />
-        <motion.div
-          className="absolute top-64 right-0 h-[500px] w-[500px] bg-violet-500/20 blur-[200px] rounded-full"
-          animate={{ y: [0, -40, 0] }}
-          transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }}
+        
+        <motion.div 
+          animate={{ 
+            scale: [1.1, 1, 1.1],
+            x: [0, -30, 0],
+            y: [0, -40, 0],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-[5%] right-[-5%] w-[600px] h-[600px] bg-violet-500/[0.12] dark:bg-violet-500/[0.15] blur-[100px] rounded-full" 
         />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:44px_44px]" />
-      </div>
 
-      {/* ==== HEADER ==== */}
-      <header className="relative z-20">
-        <div className="mx-auto max-w-7xl px-6 sm:px-8 py-6 flex items-center justify-between">
-          <Brand className="text-white" />
-          <nav className="flex items-center gap-5 text-sm">
-            <a
-              href="/login"
-              className="text-slate-300 hover:text-cyan-400 transition"
-            >
-              Login
-            </a>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
+        {/* 2. Grid Overlay - Using a visible gray instead of currentColor */}
+        <div 
+          className="absolute inset-0 opacity-[0.1] dark:opacity-[0.2]" 
+          style={{ 
+            backgroundImage: `linear-gradient(to right, #888 1px, transparent 1px), linear-gradient(to bottom, #888 1px, transparent 1px)`,
+            backgroundSize: '60px 60px' 
+          }} 
+        />
+
+        {/* 3. Topographical Lines - Made thicker (strokeWidth 1) and dark-gray */}
+        <svg className="absolute inset-0 w-full h-full opacity-20 dark:opacity-30" xmlns="http://www.w3.org/2000/svg">
+          <motion.path
+            animate={{ 
+              d: [
+                "M 0 300 Q 400 150 800 350 T 1600 250",
+                "M 0 350 Q 450 200 850 400 T 1650 300",
+                "M 0 300 Q 400 150 800 350 T 1600 250"
+              ] 
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            stroke="#888" 
+            strokeWidth="1"
+            fill="transparent"
+          />
+        </svg>
+        
+        {/* 4. Radial Mask - Darkens the edges to focus on content */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,var(--background)_85%)]" />
+      </div>
+      {/* ==== NAVIGATION ==== */}
+      <header className="fixed top-0 w-full z-50 backdrop-blur-md border-b border-border">
+        <div className="mx-auto max-w-7xl px-8 py-5 flex items-center justify-between">
+          <Brand className="text-foreground opacity-90" />
+          <nav className="flex items-center gap-4 text-[13px] font-medium tracking-wide">
+            <ThemeToggle />
+            <a href="/login" className="text-foreground hover:opacity-90 transition-colors">Sign In</a>
+            <button 
               onClick={() => setShowModal(true)}
-              className="rounded-full bg-gradient-to-r from-cyan-600 to-violet-600 px-5 py-1.5 text-sm font-semibold shadow-md hover:shadow-[0_0_20px_rgba(56,189,248,0.4)] transition"
+              className="px-6 py-2 bg-foreground text-background rounded-full hover:opacity-95 transition-all duration-300 font-semibold"
             >
-              Get started
-            </motion.button>
+              Join
+            </button>
           </nav>
         </div>
       </header>
 
-      {/* ==== HERO ==== */}
-      <section className="relative flex flex-col items-center justify-center text-center px-6 pt-24 pb-28 sm:px-8">
-        {/* Background gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-sky-900/40 via-slate-950/60 to-slate-950 -z-10" />
-
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="inline-flex items-center rounded-full bg-slate-900/70 px-4 py-1 text-xs font-medium text-slate-200 ring-1 ring-slate-700/80 backdrop-blur-sm"
-        >
-          🎓 Empowering Universities, Students & Mentors
-        </motion.p>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.8 }}
-          className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mt-6 max-w-3xl"
-        >
-          The future of{" "}
-          <span className="bg-gradient-to-r from-cyan-400 via-violet-400 to-blue-400 bg-clip-text text-transparent">
-            mentorship & learning
-          </span>{" "}
-          is here.
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="text-slate-300 text-base sm:text-lg mt-6 max-w-xl leading-relaxed"
-        >
-          MentorLink connects students with verified mentors for structured 1:1
-          sessions, growth tracking, and academic excellence within a trusted
-          ecosystem.
-        </motion.p>
-
+      {/* ==== HERO SECTION: STORYTELLING ==== */}
+      <motion.section 
+        style={{ opacity: heroOpacity, scale: heroScale }}
+        className="relative h-screen flex flex-col items-center justify-center px-6 text-center"
+      >
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="flex flex-col sm:flex-row items-center gap-4 mt-10"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-6"
         >
-          <button
-            onClick={() => setShowModal(true)}
-            className="group relative overflow-hidden rounded-full bg-gradient-to-r from-cyan-500 via-violet-500 to-blue-500 px-8 py-3 text-sm sm:text-base font-semibold text-white shadow-lg hover:scale-[1.03] transition-all duration-300"
-          >
-            <span className="relative z-10 flex items-center gap-2">
-              Get started <ArrowRight className="w-4 h-4" />
-            </span>
-            <span className="absolute inset-0 bg-gradient-to-r from-sky-400 via-cyan-400 to-violet-500 opacity-0 group-hover:opacity-30 blur-xl transition-opacity" />
-          </button>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] uppercase tracking-widest font-bold">
+            <ShieldCheck className="w-3 h-3" /> Admin Verified Network
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-light tracking-tight text-foreground max-w-4xl leading-[1.1]">
+            Expertise meets <br />
+            <span className="italic font-serif text-cyan-400">Ambition.</span>
+          </h1>
 
-          <a
-            href="#why"
-            className="rounded-full border border-slate-700 px-8 py-3 text-sm sm:text-base font-medium text-slate-300 hover:border-cyan-400 hover:text-cyan-300 transition"
-          >
-            Learn more
-          </a>
+          <p className="text-foreground text-lg md:text-xl max-w-2xl mx-auto font-light leading-relaxed">
+            MentorLink is a private ecosystem where academic excellence is fostered through 
+            structured 1:1 sessions, verified expertise, and intentional matching.
+          </p>
+
+          {/* ==== REFINED HERO BUTTONS ==== */}
+<div className="pt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
+  <motion.button
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    onClick={() => setShowModal(true)}
+    className="group relative px-10 py-4 bg-foreground text-background rounded-full font-bold text-sm tracking-tight transition-all duration-300 hover:shadow-lg"
+  >
+    <span className="relative z-10 flex items-center gap-2">
+      Get Started <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+    </span>
+  </motion.button>
+
+  <motion.a
+    href="#how"
+    whileHover={{ opacity: 1 }}
+    className="text-foreground text-sm font-medium tracking-tight opacity-70 transition-all border-b border-transparent hover:border-border pb-1"
+  >
+    Learn More
+  </motion.a>
+</div>
         </motion.div>
+
+        <motion.div 
+          animate={{ y: [0, 10, 0] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="absolute bottom-10 opacity-20"
+        >
+          <ChevronDown className="w-6 h-6" />
+        </motion.div>
+      </motion.section>
+
+      {/* ==== THE FULL LIFECYCLE: DETAILED JOURNEY ==== */}
+      <section id="how" className="relative py-32 border-t border-border bg-background">
+        <div className="mx-auto max-w-6xl px-8">
+          <div className="grid lg:grid-cols-3 gap-16">
+            <div className="lg:sticky lg:top-32 h-fit space-y-4">
+              <h2 className="text-4xl font-light text-foreground leading-tight">The Mentorship <br />Lifecycle</h2>
+              <p className="text-foreground leading-relaxed">
+                We've built a structured path to ensure every session is productive, 
+                secure, and tailored to your specific academic needs.
+              </p>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              <LifecycleStep 
+                icon={<ShieldCheck className="text-emerald-400" />}
+                title="Verified Registration"
+                desc="Both students and mentors register with their specific fields. Every profile is manually vetted by our Admin team before the dashboard is unlocked."
+              />
+              <LifecycleStep 
+                icon={<Search className="text-cyan-400" />}
+                title="Matching & Availability"
+                desc="Students instantly see mentors that match their study area. Browse real-time availability slots that fit your university schedule."
+              />
+              <LifecycleStep 
+                icon={<ClipboardList className="text-violet-400" />}
+                title="Tailored Request"
+                desc="Students fill out a mentor-specific questionnaire during the request. This ensures the mentor understands your goals before the first chat."
+              />
+              <LifecycleStep 
+                icon={<MessageSquare className="text-blue-400" />}
+                title="Smart Notifications"
+                desc="Mentors receive instant alerts for new requests. Students are notified the moment a request is accepted or rejected."
+              />
+              <LifecycleStep 
+                icon={<Video className="text-rose-400" />}
+                title="Google Meet Integration"
+                desc="Once accepted, mentors add a session link. Join your live 1:1 meeting directly from the dashboard at the scheduled time."
+              />
+              <LifecycleStep 
+                icon={<FileText className="text-orange-400" />}
+                title="Reports & Feedback"
+                desc="After the session expires, both parties submit ticket reports and feedback. Mentors can track performance via visual reports."
+              />
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* === WHY SECTION === */}
-      <FeatureSection />
-
-      {/* === HOW IT WORKS === */}
-      <AnimatedWaveSection />
-
-      {/* === TESTIMONIALS === */}
-      <TestimonialsSection />
+     {/* === STATS / INFO SECTION === */}
+<section className="py-24 border-t border-border bg-background/50">
+  <div className="mx-auto max-w-7xl px-8 grid md:grid-cols-3 gap-12 text-center">
+    <div className="space-y-2">
+      <h4 className="text-3xl font-light text-foreground">Verified</h4>
+      <p className="text-sm text-foreground/50 uppercase tracking-widest">Only trusted university members</p>
+    </div>
+    <div className="space-y-2">
+      <h4 className="text-3xl font-light text-foreground">Live 1:1</h4>
+      <p className="text-sm text-foreground/50 uppercase tracking-widest">Seamless Google Meet sessions</p>
+    </div>
+    <div className="space-y-2">
+      <h4 className="text-3xl font-light text-foreground">Matched</h4>
+      <p className="text-sm text-foreground/50 uppercase tracking-widest">Precision area-based pairing</p>
+    </div>
+  </div>
+</section>
 
       {/* === PARTNERS === */}
       <PartnersSection />
 
       {/* === FOOTER === */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/95 text-slate-400 text-xs">
-        <div className="mx-auto max-w-7xl px-6 sm:px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p>© {new Date().getFullYear()} MentorLink. All rights reserved.</p>
-          <p>Empowering mentorship through innovation.</p>
+      <footer className="py-12 border-t border-border bg-background">
+        <div className="mx-auto max-w-7xl px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+          <Brand className="opacity-50 grayscale hover:grayscale-0 transition-all" />
+          <div className="flex gap-8 text-[10px] tracking-widest text-foreground uppercase">
+            <span>Secure</span>
+            <span>Verified</span>
+            <span>Academic</span>
+          </div>
+          <p className="text-[10px] text-foreground uppercase tracking-widest">
+            © {new Date().getFullYear()} MentorLink Network
+          </p>
         </div>
       </footer>
 
@@ -145,208 +245,42 @@ export default function Landing() {
   );
 }
 
-/* === WHY SECTION === */
-function FeatureSection() {
-  const features = [
-    {
-      icon: <Sparkles className="w-5 h-5 text-cyan-400" />,
-      title: "Smart Matching",
-      text: "AI-assisted pairing between students and mentors by interests and study fields.",
-    },
-    {
-      icon: <CalendarClock className="w-5 h-5 text-violet-400" />,
-      title: "Scheduling Freedom",
-      text: "Mentors set availability, students pick slots—no overlaps, no confusion.",
-    },
-    {
-      icon: <ShieldCheck className="w-5 h-5 text-emerald-400" />,
-      title: "Verified Network",
-      text: "Every user is verified by their university or admin before joining.",
-    },
-    {
-      icon: <BarChart3 className="w-5 h-5 text-blue-400" />,
-      title: "Growth Insights",
-      text: "Track sessions, progress, and mentorship performance visually.",
-    },
-  ];
-
-  return (
-    <section id="why" className="border-t border-slate-800/70 bg-slate-950/70 py-20">
-      <div className="mx-auto max-w-7xl px-6 sm:px-8">
-        <h2 className="text-2xl font-bold text-white mb-3">Why MentorLink</h2>
-        <p className="text-slate-400 mb-10">
-          The complete mentorship ecosystem
-        </p>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((f, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ scale: 1.05 }}
-              className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow-md hover:border-cyan-500/40 transition"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                {f.icon}
-                <h3 className="text-sm font-semibold">{f.title}</h3>
-              </div>
-              <p className="text-xs text-slate-400">{f.text}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* === HOW IT WORKS - Animated Wave === */
-function AnimatedWaveSection() {
+function LifecycleStep({ icon, title, desc }) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-20% 0px" });
-  const controls = useAnimation();
-
-  useEffect(() => {
-    if (isInView) controls.start("visible");
-  }, [isInView]);
-
-  const steps = [
-    {
-      icon: <UserCheck className="w-6 h-6 text-cyan-400" />,
-      title: "Register",
-      text: "Create your student or mentor account with verified university credentials.",
-    },
-    {
-      icon: <CheckCircle2 className="w-6 h-6 text-emerald-400" />,
-      title: "Get Verified",
-      text: "Admins authenticate IDs and profiles before allowing connections.",
-    },
-    {
-      icon: <Link2 className="w-6 h-6 text-violet-400" />,
-      title: "Connect & Learn",
-      text: "Request sessions, get matched, and start growing with your mentor.",
-    },
-  ];
-
-  const waveVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: (i) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: i * 0.3, duration: 0.7, ease: "easeOut" },
-    }),
-  };
+  const isInView = useInView(ref, { once: true, margin: "-10%" });
 
   return (
-    <section
+    <motion.div 
       ref={ref}
-      id="how"
-      className="border-t border-slate-800 bg-slate-950 py-24 overflow-hidden"
+      initial={{ opacity: 0, x: 20 }}
+      animate={isInView ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.8 }}
+      className="group bg-card border border-border p-8 rounded-[2rem] hover:opacity-95 transition-all"
     >
-      <div className="mx-auto max-w-5xl px-6 sm:px-8 text-center">
-        <h2 className="text-3xl font-bold mb-12 text-white">How It Works</h2>
-        <div className="relative flex flex-col items-center space-y-20">
-          {steps.map((step, i) => (
-            <motion.div
-              key={i}
-              custom={i}
-              initial="hidden"
-              animate={controls}
-              variants={waveVariants}
-              className="flex flex-col items-center text-center relative"
-            >
-              <div className="rounded-full bg-slate-900/80 border border-slate-700 p-4 shadow-lg mb-4">
-                {step.icon}
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-1">
-                {step.title}
-              </h3>
-              <p className="text-sm text-slate-400 max-w-sm">{step.text}</p>
-
-              {i < steps.length - 1 && (
-                <motion.div
-                  initial={{ scaleY: 0 }}
-                  animate={isInView ? { scaleY: 1 } : { scaleY: 0 }}
-                  transition={{ delay: 0.4 + i * 0.3, duration: 0.6 }}
-                  className="absolute top-full w-[2px] h-20 bg-gradient-to-b from-cyan-400/40 to-violet-400/40"
-                />
-              )}
-            </motion.div>
-          ))}
+      <div className="flex gap-6 items-start">
+        <div className="p-3 bg-card rounded-2xl border border-border group-hover:border-cyan-500/50 transition-colors">
+          {icon}
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium text-foreground">{title}</h3>
+          <p className="text-sm text-foreground leading-relaxed">{desc}</p>
         </div>
       </div>
-    </section>
+    </motion.div>
   );
 }
 
-/* === TESTIMONIALS === */
-function TestimonialsSection() {
-  const testimonials = [
-    {
-      name: "Amira N.",
-      text: "MentorLink helped me connect with a senior researcher in my field — game changer!",
-      role: "Graduate Student, Cairo University",
-    },
-    {
-      name: "Dr. Evans L.",
-      text: "As a mentor, the scheduling and communication tools save me hours every week.",
-      role: "Professor, University of Nairobi",
-    },
-    {
-      name: "Tariq A.",
-      text: "My sessions boosted my thesis progress and confidence massively.",
-      role: "Mentee, Addis Ababa University",
-    },
-  ];
-
-  return (
-    <section className="border-t border-slate-800/70 bg-slate-950/80 py-20">
-      <div className="mx-auto max-w-6xl px-6 sm:px-8 text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">What Our Users Say</h2>
-        <p className="text-slate-400 mb-10 text-sm">
-          Trusted by mentors and students across universities.
-        </p>
-        <div className="grid gap-6 md:grid-cols-3">
-          {testimonials.map((t, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ scale: 1.03 }}
-              className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-md hover:border-cyan-500/30"
-            >
-              <Star className="w-5 h-5 text-cyan-400 mx-auto mb-3" />
-              <p className="text-sm text-slate-300 mb-3 italic">“{t.text}”</p>
-              <p className="text-sm font-semibold text-white">{t.name}</p>
-              <p className="text-xs text-slate-400">{t.role}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* === PARTNERS === */
 function PartnersSection() {
-  const universities = [
-    "SNU",
-    "Simada",
-    "Jamhuriya",
-    "Hormuud",
-    "Mogadishu",
-    "UNISO",
-  ];
+  const universities = ["SNU", "Simad", "Jamhuriya", "Hormuud", "Mogadishu", "UNISO"];
   return (
-    <section className="border-t border-slate-800/70 bg-slate-950/70 py-14">
-      <div className="mx-auto max-w-6xl px-6 sm:px-8 text-center">
-        <h2 className="text-2xl font-semibold mb-6 text-white">
-          Partner Universities
-        </h2>
-        <div className="flex flex-wrap justify-center gap-6 text-slate-400 text-sm">
+    <section className="py-20 bg-background">
+      <div className="mx-auto max-w-7xl px-8 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-foreground mb-12 font-bold">In partnership with leading institutions</p>
+        <div className="flex flex-wrap justify-center gap-x-16 gap-y-10 opacity-30">
           {universities.map((u, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ scale: 1.1 }}
-              className="flex items-center gap-2"
-            >
-              <Building2 className="w-4 h-4 text-cyan-400" /> {u}
-            </motion.div>
+            <div key={i} className="flex items-center gap-2 text-sm font-bold tracking-tighter text-foreground">
+              <Building2 className="w-4 h-4" /> {u}
+            </div>
           ))}
         </div>
       </div>
@@ -354,46 +288,22 @@ function PartnersSection() {
   );
 }
 
-/* === Modal === */
 function GetStartedModal({ onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl relative overflow-hidden"
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-md p-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-card border border-border rounded-[2.5rem] p-12 text-center shadow-2xl relative overflow-hidden"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-600/10 via-violet-500/10 to-blue-500/10 blur-2xl" />
-        <div className="relative z-10 text-center space-y-4">
-          <h2 className="text-lg font-semibold bg-gradient-to-r from-cyan-400 via-violet-400 to-blue-400 bg-clip-text text-transparent">
-            Get Started with MentorLink
-          </h2>
-          <p className="text-sm text-slate-400">
-            Choose how you’d like to join and start your journey.
-          </p>
-          <div className="flex flex-col gap-3">
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              onClick={() => (window.location.href = "/register/student")}
-              className="w-full rounded-full bg-gradient-to-r from-sky-500 to-violet-500 px-5 py-2.5 font-semibold text-white shadow-md hover:shadow-[0_0_20px_rgba(56,189,248,0.4)] transition"
-            >
-              Continue as Student
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              onClick={() => (window.location.href = "/register/mentor")}
-              className="w-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 font-semibold text-white shadow-md hover:shadow-[0_0_20px_rgba(52,211,153,0.4)] transition"
-            >
-              Continue as Mentor
-            </motion.button>
-          </div>
-          <button
-            onClick={onClose}
-            className="mt-4 text-xs text-slate-400 hover:text-slate-200 transition"
-          >
-            Cancel
-          </button>
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-violet-500" />
+        <h2 className="text-3xl font-light text-foreground mb-2">Join MentorLink</h2>
+        <p className="text-foreground text-sm mb-10 font-light leading-relaxed">Select your role to begin. Your profile will be submitted to admins for verification.</p>
+        <div className="space-y-4">
+          <button onClick={() => (window.location.href = "/register/student")} className="w-full py-4 rounded-2xl bg-foreground text-background font-bold hover:opacity-95 transition-all">Student Registration</button>
+          <button onClick={() => (window.location.href = "/register/mentor")} className="w-full py-4 rounded-2xl bg-card border border-border text-foreground font-bold hover:opacity-95 transition-all">Mentor Registration</button>
         </div>
+        <button onClick={onClose} className="mt-8 text-[10px] text-foreground uppercase tracking-[0.2em] hover:opacity-90 transition">Return</button>
       </motion.div>
     </div>
   );

@@ -1,8 +1,13 @@
+// frontend/src/constants/systemData.js
 const universities = [
   { key: 'snu', name: 'Somali National University (Jaamacadda Qaranka)' },
   { key: 'simad', name: 'Jaamacadda Simad' },
   { key: 'mu', name: 'Jaamacadda Muqdisho' },
-  { key: 'umadda', name: 'Jaamacadda Umadda' },
+  { key: 'benadir', name: 'Jaamacadda Benadir' },
+  { key: 'just', name: 'Jaamacadda Jamhuuriya (JUST)' },
+  { key: 'hormuud', name: 'Jaamacadda Hormuud' },
+  { key: 'zamzam', name: 'Jaamacadda Zamzam' },
+
   { key: 'other', name: 'Other / Not listed' },
 ];
 

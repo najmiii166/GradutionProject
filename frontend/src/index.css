@@ -1,3 +1,50 @@
 @import "tailwindcss";
 
-body { @apply bg-gray-50 text-gray-800; }
+@theme {
+  /* Core Brand Colors */
+  --color-slate-950: #020617;
+  --color-primary: #0ea5e9; /* cyan-500 */
+  
+  /* Modern UI Variables */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #020617;
+    --border: #e2e8f0;
+    --card: #ffffff;
+  }
+
+  /* Your App is naturally "Dark" based on the Landing Page design */
+  .dark, :root[class~="dark"] {
+    --background: #020617;
+    --foreground: #f8fafc;
+    --border: rgba(255, 255, 255, 0.1);
+    --card: rgba(255, 255, 255, 0.02);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply antialiased selection:bg-cyan-500/30;
+  }
+}
+
+@layer components {
+  /* The "Glass" style used in your Login and Modal */
+  .glass {
+    @apply backdrop-blur-xl border border-white/5 bg-white/[0.02] shadow-2xl;
+  }
+  
+  /* Custom inputs for Login/Register */
+  .input-field {
+    @apply w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-4 
+           text-sm text-white placeholder-slate-600 outline-none 
+           focus:border-cyan-500/50 focus:bg-white/[0.05] transition-all;
+  }
+}

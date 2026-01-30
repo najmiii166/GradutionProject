@@ -618,19 +618,28 @@ router.post(
 // Only data actually used in the dashboard: studentMajors & studentUniversities
 router.get("/analytics", auth, requireRole("admin"), async (req, res) => {
   try {
+    // Aggregate by student major (legacy) -- keep for backward compatibility
     const studentMajors = await safeAggregate(StudentProfile, [
-      { $group: { _id: "$major", count: { $sum: 1 } } },
+      { $group: { _id: { $ifNull: ["$major", "Unknown"] }, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
+    // Aggregate by faculty (canonical field) for Department Distribution chart
+    const studentFaculties = await safeAggregate(StudentProfile, [
+      { $group: { _id: { $ifNull: ["$faculty", "Unknown"] }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Universities aggregation: normalize null/empty to 'Unknown'
     const studentUniversities = await safeAggregate(User, [
       { $match: { role: "student", status: "verified" } },
-      { $group: { _id: "$university", count: { $sum: 1 } } },
+      { $group: { _id: { $ifNull: ["$university", "Unknown"] }, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
     res.json({
       studentMajors,
+      studentFaculties,
       studentUniversities,
     });
   } catch (err) {
