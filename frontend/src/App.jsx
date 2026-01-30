@@ -7,13 +7,13 @@
   import StudentRegister from "./pages/StudentRegister";
   import MentorRegister from "./pages/MentorRegister";
 
-  import AdminDashboard from "./pages/AdminDashboard";
+  import AdminDashboard from "./pages/admin/AdminDashboard";
   import StudentDashboard from "./pages/StudentDashboard";
   import MentorDashboard from "./pages/MentorDashboard";
   import MentorSessions from "./pages/MentorSessions";
   import MentorStudents from "./pages/MentorStudents";
   import Support from "./pages/Support";
-  import AdminTickets from "./pages/AdminTickets";
+  import AdminTickets from "./pages/admin/AdminTickets";
 
   import AllMentors from "./pages/AllMentors";
 
@@ -33,6 +33,7 @@
 
   export default function App() {
     return (
+      <div className="min-h-screen bg-background text-foreground">
       <BrowserRouter>
       
           <Routes>
@@ -101,5 +102,6 @@
           </Routes>
       
       </BrowserRouter>
+      </div>
     );
   }

@@ -11,9 +11,6 @@ import Spinner from "../components/Spinner";
 import Toast from "../components/Toast";
 import Avatar from "../components/Avatar";
 
-import useCall from "../hooks/useCall";
-import CallModal from "../components/CallModal";
-import CallWindow from "../components/CallWindow";
 
 import MentorProfileModal from "../components/mentor/MentorProfileModal";
 import StudentProfileModal from "../components/mentor/StudentProfileModal";
@@ -92,39 +89,7 @@ export default function ChatScreen() {
 
 
 
-  // -----------------------------------------
-  // CALL HOOK (temporarily disabled)
-  // -----------------------------------------
-  // Initialize call hook with the current partner and conversation
-  const {
-    incomingCall,
-    inCall,
-    startCall,
-    acceptCall,
-    rejectCall,
-    endCall,
-    remoteAudioRef,
-    callStatus,
-    setCallStatus,
-  } = useCall(socket, user, activePartnerId, activeConversationId);
-
-  // CALL DURATION TIMER
-  const [callDuration, setCallDuration] = useState(0);
-  const callTimerRef = useRef(null);
-
-  useEffect(() => {
-    if (callStatus === "connected" && inCall) {
-      callTimerRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (callTimerRef.current) clearInterval(callTimerRef.current);
-      setCallDuration(0);
-    }
-    return () => {
-      if (callTimerRef.current) clearInterval(callTimerRef.current);
-    };
-  }, [callStatus, inCall]);
+  // Voice call functionality removed (using Meet instead)
 
   // -----------------------------------------
   // LOAD CONVERSATIONS
@@ -585,23 +550,7 @@ function stopRecording() {
               </div>
             </button>
 
-            <button
-              onClick={startCall}
-              className="ml-auto px-4 py-2 bg-[#0EA5E9] hover:bg-[#0284C7] rounded shadow text-white"
-            >
-              📞 Voice Call
-            </button>
-
-
-
-            {/* Calling temporarily disabled
-            <button
-              onClick={() => call.startCall()}
-              className="ml-auto px-3 py-2 rounded bg-[#0EA5E9] hover:bg-[#0284C7] text-sm shadow"
-            >
-              Call
-            </button>
-            */}
+            {/* Voice call removed (use Meet) */}
           </div>
 
           {/* MESSAGE LIST */}
@@ -904,38 +853,7 @@ function stopRecording() {
 
             <Toast message={toast} onClose={() => setToast(null)} />
 
-      {/* INCOMING CALL MODAL */}
-{incomingCall && (
-  <CallModal
-    incoming={true}
-    name={activePartnerName} // We know the name from the active chat
-    onAccept={acceptCall}
-    onReject={rejectCall}
-  />
-)}
-
-{/* OUTGOING CALL MODAL */}
-{!incomingCall && !inCall && callStatus && (
-  <CallModal
-    incoming={false}
-    name={activePartnerName}
-    status={callStatus}
-    onReject={() => {
-      endCall();
-    }}
-  />
-)}
-
-
-{/* ACTIVE CALL WINDOW */}
-{inCall && (
-  <CallWindow
-    visible={true}
-    remoteAudioRef={remoteAudioRef}
-    duration={callDuration}  // FIXED
-    onEnd={endCall}
-  />
-)}
+      {/* Voice call components removed */}
 
     </div>
   );

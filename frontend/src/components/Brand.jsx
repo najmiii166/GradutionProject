@@ -1,17 +1,16 @@
-import { Sparkles } from "lucide-react";
+// frontend/src/components/Brand.jsx
+import { Logo } from "./Logo";
 
-export default function Brand({ className = "" }) {
+export default function Brand({ className = "", hideText = false }) {
   return (
-    <div className={`flex items-center gap-2 select-none ${className}`}>
-      {/* Logo icon */}
-      <div className="flex items-center justify-center h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-500 shadow-md">
-        <Sparkles className="h-5 w-5 text-white" />
-      </div>
+    <div className={`flex items-center gap-2.5 select-none ${className}`}>
+      <Logo className="h-8 w-8 text-cyan-500 dark:text-cyan-400 transition-colors duration-300 flex-shrink-0" />
 
-      {/* Brand name */}
-      <span className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-blue-600">
-        MentorLink
-      </span>
+      {!hideText && (
+        <span className="text-2xl font-light tracking-tighter text-foreground whitespace-nowrap">
+          Mentor<span className="font-semibold">Link</span>
+        </span>
+      )}
     </div>
   );
 }
