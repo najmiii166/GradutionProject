@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MentorLink</title>
+
+    <script>
+  (function() {
+    try {
+      const theme = localStorage.getItem('theme');
+      const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+      const isDark = theme === 'dark' || (!theme && supportDarkMode);
+      
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.style.colorScheme = 'dark'; // New: Forces browser engine to dark
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.style.colorScheme = 'light'; // New: Forces browser engine to light
+      }
+    } catch (e) {
+      console.error('Theme injection failed:', e);
+    }
+  })();
+</script>
   </head>
   <body>
     <div id="root"></div>

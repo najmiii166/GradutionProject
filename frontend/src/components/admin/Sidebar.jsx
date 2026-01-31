@@ -11,15 +11,25 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Sidebar({ activePage, setActivePage, navigate }) {
   const [isOpen, setIsOpen] = useState(false); // Mobile Drawer
   const [isCollapsed, setIsCollapsed] = useState(false); // Desktop Mini-sidebar
-  const [isDark, setIsDark] = useState(true);
+  
+  // 1. FIXED: Initialize from localStorage to prevent "reload to dark"
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
-  // Initialize/Toggle Theme
+  // 2. FIXED: Toggle Theme and Sync with Storage
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDark) {
       root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+      localStorage.setItem('theme', 'dark');
     } else {
       root.classList.remove('dark');
+      root.style.colorScheme = 'light';
+      localStorage.setItem('theme', 'light');
     }
   }, [isDark]);
 
@@ -30,8 +40,11 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
     { id: "reports", label: "Reports", icon: FileText },
   ];
 
+  // 3. FIXED: Changed localStorage.clear() to specific item removal
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // We keep the 'theme' key so the user's preference stays
     window.location.href = "/login";
   };
 
@@ -140,7 +153,6 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
       <aside 
         className={`hidden lg:flex fixed left-0 top-0 h-screen z-50 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}
       >
-        {/* Toggle Collapse Button */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-3 top-10 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center text-white z-[60] shadow-lg hover:scale-110 transition-transform"
@@ -163,7 +175,6 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
         )}
       </AnimatePresence>
 
-      {/* Dynamic spacing for page content */}
       <div className={`hidden lg:block shrink-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`} />
     </>
   );

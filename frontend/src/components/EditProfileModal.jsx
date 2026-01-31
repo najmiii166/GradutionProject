@@ -1,9 +1,11 @@
+// frontend/src/components/student/EditProfileModal.jsx
 import { useState, useEffect } from "react";
 import { api } from "../api/axios";
-import Spinner from "./Spinner";
-import { LogOut } from "lucide-react";
+import Spinner from "./Spinner"
+import { X, User, School, Mail, Target } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function EditProfileModal({ user, onClose, onUpdated, onLogout }) {
+export default function EditProfileModal({ user, onClose, onUpdated }) {
   const [form, setForm] = useState({
     fullName: user.fullName || "",
     university: user.university || "",
@@ -50,108 +52,120 @@ export default function EditProfileModal({ user, onClose, onUpdated, onLogout })
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
-      <div className="bg-slate-900/70 border border-sky-500/30 rounded-2xl p-6 w-full max-w-lg shadow-[0_0_20px_rgba(56,189,248,0.3)]">
+    <div className="fixed inset-0 bg-background/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-background/90 border border-border/50 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl shadow-cyan-500/10 backdrop-blur-2xl"
+      >
+        {/* Header Decor */}
+        <div className="h-2 w-full bg-gradient-to-r from-cyan-500 to-blue-600" />
         
-        {/* Header */}
-        <h2 className="text-xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent mb-4">
-           Profile
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
-          <div>
-            <label className="block text-sm mb-1 text-slate-400">Email</label>
-            <input
-              type="email"
-              value={form.email}
-              disabled
-              className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed"
-            />
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tighter text-foreground">
+                Account <span className="text-cyan-500">Settings</span>
+              </h2>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-foreground/40 font-bold">Manage your identity</p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          {/* Full Name */}
-          <div>
-            <label className="block text-sm mb-1 text-slate-200">Full Name</label>
-            <input
-              type="text"
-              name="fullName"
-              value={form.fullName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-white focus:border-sky-500 transition"
-            />
-          </div>
-
-          {/* University */}
-          <div>
-            <label className="block text-sm mb-1 text-slate-400">University</label>
-            <input
-              type="text"
-              value={form.university}
-              disabled
-              className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-slate-500 cursor-not-allowed"
-            />
-          </div>
-
-          {/* Mentorship Areas */}
-          <div>
-            <label className="block text-sm mb-1 text-slate-400">Mentorship Areas</label>
-            {form.mentorshipAreas.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {form.mentorshipAreas.map((area, i) => (
-                  <span
-                    key={i}
-                    className="px-2 py-1 rounded-full bg-sky-500/10 border border-sky-600 text-sky-300 text-xs"
-                  >
-                    {area}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">No mentorship areas set.</p>
-            )}
-          </div>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
-
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center pt-3">
-
-            {/* Logout Icon with Tooltip */}
-            <div className="relative group">
-              <button
-                type="button"
-                onClick={onLogout}
-                className="p-2 rounded-md border border-rose-500/30 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 transition flex items-center justify-center"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-
-              {/* Tooltip */}
-              <span className="absolute left-1/2 -translate-x-1/2 mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition bg-slate-800 text-xs text-slate-100 px-2 py-1 rounded-md border border-slate-700 whitespace-nowrap">
-                Logout
-              </span>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email (Read Only) */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
+                <Mail size={12} /> Email Address
+              </label>
+              <input
+                type="email"
+                value={form.email}
+                disabled
+                className="w-full px-4 py-3 rounded-2xl bg-foreground/[0.02] border border-border/50 text-foreground/30 cursor-not-allowed text-sm font-medium"
+              />
             </div>
 
-            <div className="flex gap-3">
+            {/* Full Name */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
+                <User size={12} /> Full Name
+              </label>
+              <input
+                type="text"
+                name="fullName"
+                value={form.fullName}
+                onChange={handleChange}
+                placeholder="Enter your full name"
+                className="w-full px-4 py-3 rounded-2xl bg-foreground/[0.03] border border-border/50 text-foreground focus:border-cyan-500/50 focus:bg-foreground/[0.05] outline-none transition-all text-sm font-medium"
+              />
+            </div>
+
+            {/* University (Read Only) */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
+                <School size={12} /> University
+              </label>
+              <input
+                type="text"
+                value={form.university}
+                disabled
+                className="w-full px-4 py-3 rounded-2xl bg-foreground/[0.02] border border-border/50 text-foreground/30 cursor-not-allowed text-sm font-medium"
+              />
+            </div>
+
+            {/* Mentorship Areas */}
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
+                <Target size={12} /> Your Focus Areas
+              </label>
+              {form.mentorshipAreas.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {form.mentorshipAreas.map((area, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 text-[10px] font-bold uppercase tracking-wider"
+                    >
+                      {area}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl border border-dashed border-border/50 text-center">
+                   <p className="text-[10px] text-foreground/30 uppercase font-bold">No areas assigned yet</p>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest text-center">{error}</p>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-4 pt-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm rounded-md border border-slate-700 hover:bg-slate-800"
+                className="flex-1 px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/40 hover:text-foreground hover:bg-foreground/5 transition-all"
               >
-                Close
+                Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 text-sm rounded-md bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 disabled:opacity-50"
+                className="flex-[2] flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-cyan-500 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-cyan-400 disabled:opacity-20 transition-all shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
               >
                 {saving ? <Spinner /> : "Save Changes"}
               </button>
             </div>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
+      </motion.div>
     </div>
   );
 }
