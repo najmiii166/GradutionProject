@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api/axios';
+import { Send, AlertCircle } from 'lucide-react';
 
 export default function SupportForm({ onSuccess }) {
   const [subject, setSubject] = useState('');
@@ -25,19 +26,60 @@ export default function SupportForm({ onSuccess }) {
     }
   };
 
+  const inputStyles = "mt-1.5 w-full rounded-xl p-3 bg-foreground/[0.03] border border-border/50 text-foreground placeholder:text-foreground/20 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/40 transition-all text-sm";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Subject Field */}
       <div>
-        <label className="block text-sm font-medium text-slate-300">Subject</label>
-        <input value={subject} onChange={(e)=>setSubject(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" />
+        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 ml-1">
+          Subject
+        </label>
+        <input 
+          value={subject} 
+          onChange={(e) => setSubject(e.target.value)} 
+          placeholder="What is this regarding?"
+          className={inputStyles} 
+        />
       </div>
+
+      {/* Message Field */}
       <div>
-        <label className="block text-sm font-medium text-slate-300">Message</label>
-        <textarea value={message} onChange={(e)=>setMessage(e.target.value)} rows={6} className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" />
+        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 ml-1">
+          Message
+        </label>
+        <textarea 
+          value={message} 
+          onChange={(e) => setMessage(e.target.value)} 
+          rows={5} 
+          placeholder="Describe your issue in detail..."
+          className={`${inputStyles} resize-none`} 
+        />
       </div>
-      {error && <div className="text-rose-400 text-sm">{error}</div>}
-      <div>
-        <button disabled={loading} className="px-4 py-2 bg-sky-500 rounded-md text-white">{loading ? 'Sending...' : 'Send to Support'}</button>
+
+      {/* Error Handling */}
+      {error && (
+        <div className="flex items-center gap-2 text-rose-500 text-xs font-bold uppercase tracking-tight bg-rose-500/5 p-3 rounded-lg border border-rose-500/10">
+          <AlertCircle size={14} />
+          {error}
+        </div>
+      )}
+
+      {/* Submit Button */}
+      <div className="pt-2">
+        <button 
+          disabled={loading} 
+          className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 rounded-2xl text-white text-[11px] font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
+        >
+          {loading ? (
+            'Transmitting...'
+          ) : (
+            <>
+              <Send size={14} strokeWidth={2.5} />
+              Send Ticket
+            </>
+          )}
+        </button>
       </div>
     </form>
   );
