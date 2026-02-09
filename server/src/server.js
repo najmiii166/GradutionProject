@@ -30,40 +30,65 @@ import supportRoutes from "./routes/support.routes.js";
 import adminTicketsRoutes from "./routes/admin.tickets.js";
 import enrollmentsRoutes from "./routes/enrollments.routes.js";
 import sessionsRoutes from "./routes/sessions.routes.js";
+import recommendationsRoutes from "./routes/recommendations.routes.js";
+// AI routes removed
+import feedbackRoutes from "./routes/feedback.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set("trust proxy", true);
 
 /* ===============================
-   ALLOWED ORIGINS (RAILWAY FIX)
+   ALLOWED ORIGINS (CORS FIX)
 ================================ */
+const FRONTEND_URL = process.env.FRONTEND_URL;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://graduation-project-eight.vercel.app",
+  "https://graduation-project-jade.vercel.app", // ✅ YOUR NEW LIVE VERCEL DOMAIN
   "https://gradution-project-git-main-najmiii166s-projects.vercel.app",
-  "https://gradution-project-najmiii166s-projects.vercel.app" // Vercel main link
+  "https://graduation-project-najmiii166s-projects.vercel.app",
+  // allow explicit FRONTEND_URL from env if configured
+  ...(FRONTEND_URL ? [FRONTEND_URL] : []),
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    // Ogolaansho sii haddii uu ku jiro liiska ama uu yahay vercel subdomain
-    const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+// Same rule for HTTP + Socket
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Postman / server-to-server
+  try {
+    // Allow any localhost port in dev
+    if (origin.startsWith("http://localhost:")) return true;
+
+    if (allowedOrigins.includes(origin)) return true;
+    if (origin.endsWith(".vercel.app")) return true;
+    // catch other common hosting patterns
+    if (origin.includes("vercel.app") || origin.includes("railway.app")) return true;
+  } catch (e) {
+    return false;
+  }
+  return false;
+};
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // IMPORTANT: do NOT pass an Error to the callback here — that can prevent
+    // CORS headers from being sent and lead to the browser reporting
+    // "No 'Access-Control-Allow-Origin' header is present". Return a boolean
+    // instead so the middleware can handle responses normally.
+    if (isOriginAllowed(origin)) return callback(null, true);
+    console.warn("Blocked CORS origin:", origin);
+    return callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"]
 }));
 
-app.options("*", cors()); // Enable pre-flight for all routes
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // ✅ IMPORTANT: preflight uses SAME options
 
 app.use(cookieParser());
 app.use(express.json());
@@ -85,10 +110,18 @@ app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
 app.use("/api/sessions", sessionsRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
+// Debug route: returns the request Origin and whether it's allowed by CORS.
+// Useful for remote debugging when browser shows CORS errors.
+app.get("/api/_debug/origin", (req, res) => {
+  const origin = req.get("origin") || null;
+  console.log("[DEBUG] Incoming Origin:", origin);
+  return res.json({ origin, allowed: isOriginAllowed(origin) });
+});
 
 // HEALTH CHECK
-
 app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
 const server = http.createServer(app);
@@ -97,7 +130,13 @@ app.set("trust proxy", 1);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["polling", "websocket"],
-  cors: { origin: allowedOrigins, credentials: true }
+  cors: {
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS (socket): " + origin));
+    },
+    credentials: true,
+  },
 });
 
 app.set("io", io);
@@ -126,7 +165,6 @@ io.on("connection", (socket) => {
 /* ===============================
    START SERVER (RAILWAY PORT FIX)
 ================================ */
-// Railway wuxuu u baahan yahay 0.0.0.0 si uu dibadda u aqbalo requests
 const PORT = process.env.PORT || 8080;
 
 connectDB()
@@ -143,7 +181,6 @@ connectDB()
       console.log(`🚀 Server running on port ${PORT}`)
     );
   })
-
   .catch((err) => {
     console.error("❌ DB Error:", err);
     process.exit(1);

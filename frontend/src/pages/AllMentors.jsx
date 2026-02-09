@@ -150,7 +150,69 @@ export default function AllMentors() {
         </button>
       </div>
 
-      {/* MENTORS GRID */}
+      {/* Filters Section */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 mb-6 shadow-xl backdrop-blur-md">
+        <div className="flex flex-col md:flex-row items-center gap-3">
+
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by mentor name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm focus:border-sky-500"
+            />
+          </div>
+
+          <select
+            value={universityFilter}
+            onChange={(e) => setUniversityFilter(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
+          >
+            <option value="">University</option>
+            {[...new Set(mentors.map((m) => m.user?.university).filter(Boolean))].map((u, idx) => (
+              <option key={`${u}-${idx}`} value={u}>{u}</option>
+            ))}
+          </select>
+
+          <select
+            value={dayFilter}
+            onChange={(e) => setDayFilter(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
+          >
+            <option value="">Availability</option>
+            {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d, idx) => (
+              <option key={`${d}-${idx}`} value={d}>{d}</option>
+            ))}
+          </select>
+
+          <select
+            value={experienceFilter}
+            onChange={(e) => setExperienceFilter(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
+          >
+            <option value="">Experience</option>
+            {[1, 2, 3, 5, 10, 15].map((y, idx) => (
+              <option key={`${y}-${idx}`} value={y}>{y}+ years</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => {
+              setSearch("");
+              setUniversityFilter("");
+              setDayFilter("");
+              setExperienceFilter("");
+            }}
+            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs text-sky-400 hover:text-sky-300"
+          >
+            <RefreshCcw className="w-4 h-4" /> Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Mentors List */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, idx) => (
@@ -183,11 +245,14 @@ export default function AllMentors() {
           mentor={selectedMentor}
           onClose={() => setSelectedMentor(null)}
           onRequestSent={handleRequestSent}
-          disabledGlobal={activeCount >= 2}
-          disabledMentor={requests.some((r) => {
-            const mid = r.mentorId?._id || r.mentorId;
-            return String(mid) === String(selectedMentor._id) && ["pending", "upcoming", "ongoing"].includes(r.status);
-          })}
+          disabled={
+            activeCount >= 2 ||
+            requests.some(
+              (r) =>
+                ["pending", "upcoming", "ongoing"].includes(r.status) &&
+                String(r.mentorId?._id || r.mentorId) === String(selectedMentor._id)
+            )
+          }
         />
       )}
 

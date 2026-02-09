@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Spinner from "../Spinner";
 import { faculties } from "../../constants/systemData";
+import { api } from "../../api/axios";
 
 const formatTime = (time) => {
   if (!time) return "";
@@ -37,6 +38,7 @@ export default function MentorRequests({
   externalOpenRequest,
 }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
+  // AI Analyze removed: no toast needed here
 
   useEffect(() => {
     if (externalOpenRequest) {
@@ -252,6 +254,7 @@ export default function MentorRequests({
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Toast removed (AI analyze only) */}
     </>
   );
 }

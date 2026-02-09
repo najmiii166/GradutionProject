@@ -26,6 +26,7 @@
   // import ReportGenerate from "./pages/ReportGenerate";
   import ReportView from "./pages/ReportView";
   import HistoryPage from "./pages/HistoryPage";
+  
 
 
 
@@ -98,6 +99,7 @@
           </Routes>
         </SocketProvider>
       </BrowserRouter>
+      {/* AI Assistant removed */}
       </div>
     );
   }

@@ -27,6 +27,20 @@ function groupByMonth(sessions) {
 
 const router = express.Router();
 
+// Helper: strict join window (UTC via ISO Date parsing)
+function computeCanJoin(startTime, endTime, minutesBefore = 5) {
+  try {
+    if (!startTime) return false;
+    const start = new Date(startTime);
+    const end = endTime ? new Date(endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+    const now = new Date();
+    const openAt = new Date(start.getTime() - minutesBefore * 60 * 1000);
+    return now >= openAt && now <= end;
+  } catch {
+    return false;
+  }
+}
+
 // GET /api/sessions/mentor/:id
 router.get("/mentor/:id", auth, async (req, res) => {
   try {
@@ -59,6 +73,10 @@ router.get("/mentor/:id", auth, async (req, res) => {
         }
       }
 
+      // Optional canJoin flag for defensive UI on clients
+      updated.canJoin = computeCanJoin(updated.startTime, updated.endTime, 5);
+      // Expose no-show status
+      updated.noShowStatus = updated.noShowStatus || "none";
       return updated;
     });
 

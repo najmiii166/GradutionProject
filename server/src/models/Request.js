@@ -55,7 +55,28 @@ const RequestSchema = new mongoose.Schema({
   },
 
   mentorJoined: { type: Boolean, default: false },
-studentJoined: { type: Boolean, default: false },
+  studentJoined: { type: Boolean, default: false },
+  // Audit trail of join events (button clicks)
+  joinEvents: [
+    new mongoose.Schema(
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: { type: String, enum: ["mentor", "student", "admin"], required: true },
+        joinedAt: { type: Date, default: Date.now },
+        source: { type: String, default: "button" },
+        userAgent: { type: String },
+        ip: { type: String },
+      },
+      { _id: false }
+    ),
+  ],
+  firstJoinAt: { type: Date },
+  lastJoinAt: { type: Date },
+  noShowStatus: {
+    type: String,
+    enum: ["none", "student_no_show", "mentor_no_show", "both_no_show"],
+    default: "none",
+  },
 
 
   // 🔹 NEW: Meeting link (Google Meet, Zoom, etc.)

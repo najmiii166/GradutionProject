@@ -10,6 +10,20 @@ import { finalizeSession } from "../utils/finalizeSession.js";
 
 const router = express.Router();
 
+// Helper: strict join window (UTC via ISO Date parsing)
+function computeCanJoin(startTime, endTime, minutesBefore = 5) {
+  try {
+    if (!startTime) return false;
+    const start = new Date(startTime);
+    const end = endTime ? new Date(endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+    const now = new Date();
+    const openAt = new Date(start.getTime() - minutesBefore * 60 * 1000);
+    return now >= openAt && now <= end;
+  } catch {
+    return false;
+  }
+}
+
 /* ============================
    CREATE REQUEST (STUDENT)
 ============================ */
@@ -24,7 +38,15 @@ router.post("/", auth, async (req, res) => {
 
 
     if (!mentorId || !slot) {
-      return res.status(400).json({ message: "Missing mentor or slot." });
+      return res.status(400).json({ success: false, message: "Missing mentor or slot." });
+    }
+
+    // minimal slot validation
+    const day = slot?.day;
+    const from = slot?.from;
+    const to = slot?.to;
+    if (!day || !from || !to) {
+      return res.status(400).json({ success: false, message: "Slot requires day, from and to." });
     }
 
     // Prevent having more than 2 active requests across all mentors
@@ -44,11 +66,13 @@ router.post("/", auth, async (req, res) => {
       studentId,
       mentorId,
       status: { $in: ["pending", "upcoming", "ongoing"] },
-    });
+    }).sort({ requestedAt: -1 });
 
-    if (exists) {
-      return res.status(400).json({
-        message: "You already have a pending or upcoming request with this mentor.",
+    if (activeExisting) {
+      return res.status(409).json({
+        success: false,
+        message: "You already have an active request with this mentor.",
+        data: { existingRequestId: activeExisting._id, status: activeExisting.status },
       });
     }
 
@@ -92,7 +116,7 @@ router.post("/", auth, async (req, res) => {
     res.json(newReq);
   } catch (err) {
     console.error("REQUEST CREATE ERROR:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -125,10 +149,14 @@ router.get("/student", auth, async (req, res) => {
 
       if (newStatus !== r.status) {
         updates.push({ id: r._id, status: newStatus });
-        return { ...r, status: newStatus };
+        const withStatus = { ...r, status: newStatus };
+        // Optional flag: canJoin strictly within 5 min before start until end
+        withStatus.canJoin = computeCanJoin(withStatus.startTime, withStatus.endTime, 5);
+        return withStatus;
       }
-
-      return r;
+      const withFlag = { ...r };
+      withFlag.canJoin = computeCanJoin(withFlag.startTime, withFlag.endTime, 5);
+      return withFlag;
     });
 
     // persist changes
@@ -348,6 +376,9 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
         endTime: s.endTime,
         meetingLink: s.meetingLink || "",
         requestedAt: s.requestedAt,
+        // Optional helper flag: strict join window in UTC
+        canJoin: computeCanJoin(s.startTime, s.endTime, 5),
+        noShowStatus: s.noShowStatus || "none",
       };
     });
 
@@ -366,20 +397,66 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
 
 // POST /api/requests/:id/join
 router.post("/:id/join", auth, async (req, res) => {
-  const request = await Request.findById(req.params.id);
-  if (!request) return res.sendStatus(404);
+  try {
+    const request = await Request.findById(req.params.id).lean();
+    if (!request) return res.status(404).json({ success: false, message: "Session not found" });
 
-  if (req.user.role === "mentor") request.mentorJoined = true;
-  if (req.user.role === "student") request.studentJoined = true;
+    // Verify caller is participant
+    const isStudent = req.user.role === "student" && String(request.studentId) === String(req.user.id);
+    let isMentor = false;
+    if (req.user.role === "mentor") {
+      const mentorProfile = await MentorProfile.findById(request.mentorId).populate({ path: "user", model: "User", select: "_id" }).lean();
+      isMentor = mentorProfile?.user?._id && String(mentorProfile.user._id) === String(req.user.id);
+    }
+    if (!isStudent && !isMentor) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
 
-  await request.save();
+    // Rate limit: max 3 join events per minute per user per session, based on stored events
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+    const current = await Request.findById(req.params.id);
+    const recentCount = (current.joinEvents || []).filter(
+      (e) => String(e.userId) === String(req.user.id) && e.joinedAt && new Date(e.joinedAt) >= oneMinuteAgo
+    ).length;
+    if (recentCount >= 3) {
+      return res.status(429).json({ success: false, message: "Rate limit exceeded. Try again in a minute." });
+    }
 
-  // notify both via socket
-  const io = req.app.get("io");
-  io.to(String(request.studentId)).emit("session:update", request._id);
-  io.to(String(request.mentorId)).emit("session:update", request._id);
+    // Append audit event
+    current.joinEvents = current.joinEvents || [];
+    current.joinEvents.push({
+      userId: req.user.id,
+      role: isMentor ? "mentor" : "student",
+      joinedAt: now,
+      source: "button",
+      userAgent: req.headers["user-agent"] || "",
+      ip: req.ip || req.headers["x-forwarded-for"] || "",
+    });
 
-  res.json({ success: true });
+    // Convenience flags
+    if (isMentor) current.mentorJoined = true;
+    if (isStudent) current.studentJoined = true;
+
+    if (!current.firstJoinAt) current.firstJoinAt = now;
+    current.lastJoinAt = now;
+
+    await current.save();
+
+    // notify both via socket
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(String(current.studentId)).emit("session:update", current._id);
+        io.to(String(current.mentorId)).emit("session:update", current._id);
+      }
+    } catch {}
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("JOIN track error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 
