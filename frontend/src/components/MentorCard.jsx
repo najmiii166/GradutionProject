@@ -1,11 +1,12 @@
 // src/components/student/MentorCard.jsx
 import { motion } from "framer-motion";
 import { Calendar, Sparkles, Briefcase, Star } from "lucide-react";
-import { faculties } from "../constants/systemData";
+import { faculties, universities } from "../constants/systemData";
 
-export default function MentorCard({ mentor, onClick }) {
+export default function MentorCard({ mentor, onClick, disabled = false }) {
   const name = mentor.user?.fullName || "Unknown Mentor";
-  const university = mentor.user?.university || "—";
+  const universityKey = mentor.user?.university || mentor.institution || "";
+  const university = universities.find((u) => String(u.key) === String(universityKey))?.name || "Independent";
   const expertise = mentor.expertiseAreas || [];
   const availability = mentor.availability || [];
   const experience = mentor.yearsOfExperience ?? 0;
@@ -86,12 +87,44 @@ export default function MentorCard({ mentor, onClick }) {
         </div>
 
         <button
-          onClick={onClick}
-          className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl bg-foreground text-background hover:bg-cyan-500 hover:text-white transition-all duration-300 shadow-lg shadow-black/10"
+          onClick={disabled ? undefined : onClick}
+          disabled={disabled}
+          className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all duration-300 shadow-lg shadow-black/10 ${disabled ? 'bg-foreground/10 text-foreground/40 cursor-not-allowed border border-border/30' : 'bg-foreground text-background hover:bg-cyan-500 hover:text-white'}`}
         >
           Request
         </button>
       </div>
     </motion.div>
+  );
+}
+
+export function MentorCardSkeleton() {
+  return (
+    <div className="relative flex flex-col justify-between min-h-[260px] p-5 rounded-2xl border border-border/30 bg-card/40 backdrop-blur-xl shadow-xl animate-pulse">
+      <div>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="h-12 w-12 rounded-xl bg-foreground/10" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-foreground/10 rounded-full w-32" />
+            <div className="h-3 bg-foreground/8 rounded-full w-24" />
+            <div className="h-3 bg-foreground/6 rounded-full w-20" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="h-3 bg-foreground/10 rounded-full w-28" />
+          <div className="flex gap-2">
+            <div className="h-5 bg-foreground/10 rounded-lg w-20" />
+            <div className="h-5 bg-foreground/8 rounded-lg w-16" />
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 pt-4 border-t border-border/20 flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-2 bg-foreground/8 rounded-full w-16" />
+          <div className="h-3 bg-foreground/6 rounded-full w-24" />
+        </div>
+        <div className="h-8 w-20 bg-foreground/10 rounded-xl" />
+      </div>
+    </div>
   );
 }

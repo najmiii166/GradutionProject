@@ -1,6 +1,9 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import rateLimit from "express-rate-limit";
+import csrf from "csurf";
 import { validationResult } from "express-validator";
 
 import User from "../models/User.js";
@@ -13,8 +16,26 @@ import {
 } from "../utils/validators.js";
 import { uploadIdCard } from "../middleware/upload.js";
 import { auth } from "../middleware/auth.js";
+import { sendPasswordResetEmail } from "../services/mailer.js";
 
 const router = express.Router();
+
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "If that email exists, you will receive instructions shortly." },
+  
+});
 
 /* =======================================================
    TOKEN HELPER
@@ -46,6 +67,7 @@ router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
       expertiseAreas,
       availability,
       university,
+      socialLinks,
     } = req.body;
 
     const existing = await User.findOne({ email });
@@ -85,6 +107,7 @@ router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
       bio,
       expertiseAreas: expertiseList,
       availability: cleanAvailability,
+      socialLinks: socialLinks || {},
     });
 
     res.status(201).json({ message: "Mentor registered. Await admin verification." });
@@ -198,6 +221,24 @@ router.post("/login", loginRules, async (req, res) => {
 });
 
 /* =======================================================
+   CHECK EMAIL (used by frontend step validation)
+======================================================= */
+router.post("/check-email", async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(409).json({ message: "Email already in use" });
+
+    return res.json({ message: "Email available" });
+  } catch (err) {
+    console.error("/auth/check-email error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* =======================================================
    GET LOGGED-IN USER (used by dashboard)
 ======================================================= */
 router.get("/me", auth, async (req, res) => {
@@ -226,6 +267,71 @@ router.get("/me", auth, async (req, res) => {
   } catch (err) {
     console.error("GET /auth/me error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/csrf-token", csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+router.post("/forgot-password", forgotPasswordLimiter, csrfProtection, async (req, res) => {
+  const { email } = req.body || {};
+  const genericResponse = { message: "If that email exists, you will receive instructions shortly." };
+
+  try {
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(200).json(genericResponse);
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return res.status(200).json(genericResponse);
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    user.resetPassword = {
+      token: hashedToken,
+      expiresAt: new Date(Date.now() + 20 * 60 * 1000),
+    };
+
+    await user.save();
+    await sendPasswordResetEmail({ to: user.email, name: user.fullName, token: rawToken });
+
+    return res.status(200).json(genericResponse);
+  } catch (err) {
+    console.error("POST /auth/forgot-password error:", err);
+    return res.status(200).json(genericResponse);
+  }
+});
+
+router.post("/reset-password", csrfProtection, async (req, res) => {
+  const { token, password } = req.body || {};
+  const genericError = { message: "Invalid or expired reset link." };
+
+  try {
+    if (typeof token !== "string" || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json(genericError);
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      "resetPassword.token": hashedToken,
+      "resetPassword.expiresAt": { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json(genericError);
+
+    user.passwordHash = await bcrypt.hash(password, 12);
+    user.resetPassword = undefined;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ message: "Your password has been updated. Please log in with your new credentials." });
+  } catch (err) {
+    console.error("POST /auth/reset-password error:", err);
+    return res.status(400).json(genericError);
   }
 });
 

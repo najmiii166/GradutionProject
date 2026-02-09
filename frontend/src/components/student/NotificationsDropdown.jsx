@@ -1,3 +1,4 @@
+// frontend/src/components/student/NotificationsDropdown.jsx
 import React from "react";
 import { api } from "../../api/axios";
 import { formatSessionInfo } from "../../utils/student";
@@ -135,7 +136,7 @@ export default function NotificationsDropdown({
                         }}
                         className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-foreground/40 hover:text-rose-500 transition-colors"
                       >
-                        <Trash2 size={12} /> Clear Update
+                        <Trash2 size={12} /> Remove
                       </button>
                     )}
                   </div>

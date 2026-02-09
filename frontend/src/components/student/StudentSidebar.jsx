@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Brand from "../Brand";
+import ChatNotificationBadge from "../ChatNotificationBadge";
 
 export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
   // 1. Initialize from localStorage so it doesn't "reset" to true on reload
@@ -80,6 +81,8 @@ export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
                   className="absolute -left-10 w-1.5 h-6 bg-cyan-500 rounded-r-full"
                 />
               )}
+              
+             {item.id === "chat" && <ChatNotificationBadge />}
             </button>
 
             {/* Tooltip */}

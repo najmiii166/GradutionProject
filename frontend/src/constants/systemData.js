@@ -1,6 +1,6 @@
 // frontend/src/constants/systemData.js
 const universities = [
-  { key: 'snu', name: 'Somali National University (Jaamacadda Qaranka)' },
+  { key: 'snu', name: 'Somali National University' },
   { key: 'simad', name: 'Jaamacadda Simad' },
   { key: 'mu', name: 'Jaamacadda Muqdisho' },
   { key: 'benadir', name: 'Jaamacadda Benadir' },
@@ -42,4 +42,14 @@ const faculties = [
   },
 ];
 
-export { universities, faculties };
+const DAYS = [
+  { key: "Mon", label: "Monday" },
+  { key: "Tue", label: "Tuesday" },
+  { key: "Wed", label: "Wednesday" },
+  { key: "Thu", label: "Thursday" },
+  { key: "Fri", label: "Friday" },
+  { key: "Sat", label: "Saturday" },
+  { key: "Sun", label: "Sunday" },
+];
+
+export { universities, faculties, DAYS };

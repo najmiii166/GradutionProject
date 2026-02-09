@@ -10,6 +10,7 @@ import Report from "../models/Report.js";
 import Request from "../models/Request.js";
 import { getGlobalMetrics, safeAggregate } from "../utils/metrics.js";
 import mongoose from 'mongoose';
+import { sendUserApprovedEmail, sendUserRejectedEmail } from "../services/mailer.js";
 
 const router = express.Router();
 
@@ -536,9 +537,19 @@ router.get("/pending", auth, requireRole("admin"), async (req, res) => {
   try {
     const role = req.query.role === "mentor" ? "mentor" : "student";
 
-    const users = await User.find({ role, status: "pending" })
-      .sort({ createdAt: -1 })
-      .lean();
+    let users = [];
+    if (role === 'mentor') {
+      // Include mentor profile fields so frontend can display institution and other profile data
+      users = await User.aggregate([
+        { $match: { role: 'mentor', status: 'pending' } },
+        { $sort: { createdAt: -1 } },
+        { $lookup: { from: 'mentorprofiles', localField: '_id', foreignField: 'user', as: 'mentorProfile' } },
+        { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+        { $project: { passwordHash: 0 } },
+      ]).allowDiskUse(true);
+    } else {
+      users = await User.find({ role, status: "pending" }).sort({ createdAt: -1 }).lean();
+    }
 
     res.json({ users });
   } catch (err) {
@@ -582,8 +593,21 @@ router.post(
       );
 
       if (!user) return res.status(404).json({ message: "User not found" });
+      let emailStatus = "not-sent";
 
-      res.json({ message: "User approved", user });
+      try {
+        await sendUserApprovedEmail({
+          to: user.email,
+          name: user.fullName,
+          role: user.role,
+        });
+        emailStatus = "sent";
+      } catch (emailErr) {
+        console.error("Approve user email error:", emailErr);
+        emailStatus = "failed";
+      }
+
+      res.json({ message: "User approved", user, emailStatus });
     } catch (err) {
       console.error("Approve user error:", err);
       res.status(500).json({ message: "Failed to approve user" });
@@ -605,8 +629,21 @@ router.post(
       );
 
       if (!user) return res.status(404).json({ message: "User not found" });
+      let emailStatus = "not-sent";
 
-      res.json({ message: "User rejected", user });
+      try {
+        await sendUserRejectedEmail({
+          to: user.email,
+          name: user.fullName,
+          role: user.role,
+        });
+        emailStatus = "sent";
+      } catch (emailErr) {
+        console.error("Reject user email error:", emailErr);
+        emailStatus = "failed";
+      }
+
+      res.json({ message: "User rejected", user, emailStatus });
     } catch (err) {
       console.error("Reject user error:", err);
       res.status(500).json({ message: "Failed to reject user" });
@@ -657,11 +694,32 @@ router.get("/users", auth, requireRole("admin"), async (req, res) => {
       return res.status(400).json({ message: "Invalid status filter" });
     }
 
-    const users = await User.find({ status })
-      .sort({ createdAt: -1 })
-      .lean();
+    const users = await User.find({ status }).sort({ createdAt: -1 }).lean();
 
-    res.json({ users });
+    const mentorIds = users.filter((u) => u.role === 'mentor').map((u) => u._id);
+    const studentIds = users.filter((u) => u.role === 'student').map((u) => u._id);
+
+    const [mentorProfiles, studentProfiles] = await Promise.all([
+      mentorIds.length ? MentorProfile.find({ user: { $in: mentorIds } }).lean() : [],
+      studentIds.length ? StudentProfile.find({ user: { $in: studentIds } }).lean() : [],
+    ]);
+
+    const mentorMap = new Map(mentorProfiles.map((mp) => [String(mp.user), mp]));
+    const studentMap = new Map(studentProfiles.map((sp) => [String(sp.user), sp]));
+
+    const enriched = users.map((u) => {
+      const copy = { ...u };
+      if (copy.role === 'mentor') {
+        copy.mentorProfile = mentorMap.get(String(copy._id)) || null;
+        copy.institution = copy.mentorProfile?.institution || copy.institution || copy.university || null;
+      } else if (copy.role === 'student') {
+        copy.studentProfile = studentMap.get(String(copy._id)) || null;
+        copy.institution = copy.studentProfile?.faculty || copy.university || null;
+      }
+      return copy;
+    });
+
+    res.json({ users: enriched });
   } catch (err) {
     console.error("Users by status error:", err);
     res.status(500).json({ message: "Failed to load users" });

@@ -1,5 +1,5 @@
 // src/components/student/MentorsPanel.jsx
-import MentorCard from "../MentorCard";
+import MentorCard, { MentorCardSkeleton } from "../MentorCard";
 import { Search, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom"; // Ensure this is imported
@@ -45,9 +45,15 @@ export default function MentorsPanel({ mentors, loading, onSelect }) {
             className="h-40 flex items-center justify-center border border-dashed border-border/50 rounded-xl"
           >
             <p className="text-[11px] uppercase tracking-widest text-foreground/40 font-bold">
-              No matching profiles found
+              No matching Mentors found
             </p>
           </motion.div>
+        ) : loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <MentorCardSkeleton key={idx} />
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {mentors.slice(0, 3).map((m, idx) => (

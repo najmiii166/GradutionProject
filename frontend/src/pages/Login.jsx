@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api, setAuthToken } from "../api/axios";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
@@ -13,6 +13,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const resetMessage = sessionStorage.getItem("resetSuccess");
+    if (resetMessage) {
+      setToast(resetMessage);
+      sessionStorage.removeItem("resetSuccess");
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -108,6 +116,11 @@ export default function Login() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <div className="flex justify-end text-sm">
+                <a href="/forgot-password" className="text-cyan-400 hover:underline">
+                  Forgot password?
+                </a>
+              </div>
 
               {/* Using your Global Button Component */}
               <Button
@@ -142,7 +155,7 @@ export default function Login() {
       <Toast
         message={toast}
         onClose={() => setToast(null)}
-        type={toast?.includes("successfully") ? "success" : "error"}
+        type={toast && /successfully|updated/i.test(toast) ? "success" : "error"}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import {
   Clock,
   Calendar,
   User,
+  Activity
 } from "lucide-react";
 
 function formatDuration(start, end) {
@@ -66,56 +67,65 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400">
-        Loading history…
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground/40 gap-4">
+        <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em]">Loading history...</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-white overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute -top-40 -left-40 h-[450px] w-[450px] bg-sky-500/20 blur-[180px] rounded-full" />
-        <div className="absolute top-60 right-0 h-[350px] w-[350px] bg-blue-500/20 blur-[160px] rounded-full" />
+    <div className="relative min-h-screen bg-background text-foreground selection:bg-primary/30">
+      {/* Strategic Background Accents */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div className="absolute top-[-10%] left-[-10%] h-[40%] w-[40%] bg-primary/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] h-[40%] w-[40%] bg-primary/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        {/* HEADER */}
+      <div className="max-w-6xl mx-auto px-8 py-16">
+        {/* HEADER SECTION */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-8"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-border/40 pb-10"
         >
-          <History className="w-6 h-6 text-sky-400" />
-          <h1 className="text-2xl font-semibold">Session History</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-4xl font-semibold ">Session <span className="text-primary font-medium">History</span></h1>
+          </div>
+          
+          {/* FILTER TABS */}
+          <div className="flex bg-card border border-border/50 p-1 rounded-2xl backdrop-blur-md">
+            {["all", "completed", "expired"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                  filter === f
+                    ? "bg-primary text-white shadow-lg shadow-primary/20"
+                    : "text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </motion.div>
-
-        {/* FILTERS */}
-        <div className="flex gap-2 mb-10">
-          {["all", "completed", "expired"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${
-                filter === f
-                  ? "bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
 
         {/* EMPTY STATE */}
         {!hasAnySessions && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-10 text-center text-slate-400">
-            No past sessions yet.
-          </div>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-[2.5rem] border border-border/30 bg-card/30 p-20 text-center backdrop-blur-sm"
+          >
+            <Activity className="w-12 h-12 text-foreground/10 mx-auto mb-4" />
+            <p className="text-sm font-medium text-foreground/40 italic font-serif">
+              "No historical data detected in current node parameters."
+            </p>
+          </motion.div>
         )}
 
-        {/* GROUPED BY MONTH */}
+        {/* GROUPED LOGS */}
         {Object.entries(data).map(([month, sessions]) => {
           const visible =
             filter === "all"
@@ -125,11 +135,14 @@ export default function HistoryPage() {
           if (!visible || visible.length === 0) return null;
 
           return (
-            <div key={month} className="mb-12">
-              <h2 className="text-sm text-slate-400 mb-4">{month}</h2>
+            <div key={month} className="mb-16">
+              <div className="flex items-center gap-4 mb-6">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-primary/50 whitespace-nowrap">{month}</h2>
+                <div className="h-[1px] w-full bg-gradient-to-r from-primary/20 to-transparent" />
+              </div>
 
-              <div className="space-y-4">
-                {visible.map((s) => {
+              <div className="grid grid-cols-1 gap-4">
+                {visible.map((s, idx) => {
                   const completed = s.status === "completed";
                   const otherParty =
                     role === "mentor"
@@ -139,33 +152,35 @@ export default function HistoryPage() {
                   return (
                     <motion.div
                       key={s._id}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg"
+                      transition={{ delay: idx * 0.05 }}
+                      className="group relative rounded-[2rem] border border-border/40 bg-card/40 p-6 backdrop-blur-sm hover:border-primary/30 transition-all duration-500"
                     >
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        {/* LEFT */}
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-2 text-sm font-medium">
-                            <User className="w-4 h-4 text-sky-400" />
-                            {otherParty || "—"}
-                          </p>
-
-                          <p className="flex items-center gap-2 text-xs text-slate-400">
-                            <Calendar className="w-4 h-4" />
-                            {s.startTime
-                              ? new Date(s.startTime).toLocaleString()
-                              : "—"}
-                          </p>
-
-                          <p className="flex items-center gap-2 text-xs text-slate-400">
-                            <Clock className="w-4 h-4" />
-                            Duration: {formatDuration(s.startTime, s.endTime)}
-                          </p>
-
-                          <p className="text-xs text-slate-500">
-                            Slot: {s.slot?.day} • {s.slot?.from} → {s.slot?.to}
-                          </p>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        
+                        {/* IDENTITY & TIME */}
+                        <div className="flex items-center gap-5">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-colors duration-500 ${
+                            completed ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-500" : "bg-rose-500/5 border-rose-500/20 text-rose-500"
+                          }`}>
+                            <User size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">
+                              {otherParty || "Unknown Identity"}
+                            </h3>
+                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1">
+                              <span className="flex items-center gap-1.5 text-[11px] font-bold text-foreground/40 uppercase tracking-wider">
+                                <Calendar size={12} className="text-primary/50" />
+                                {s.startTime ? new Date(s.startTime).toLocaleDateString() : "—"}
+                              </span>
+                              <span className="flex items-center gap-1.5 text-[11px] font-bold text-foreground/40 uppercase tracking-wider">
+                                <Clock size={12} className="text-primary/50" />
+                                {formatDuration(s.startTime, s.endTime)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
                         {/* STATUS */}

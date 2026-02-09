@@ -49,8 +49,20 @@ router.post("/", auth, async (req, res) => {
       return res.status(400).json({ success: false, message: "Slot requires day, from and to." });
     }
 
-    // Disallow duplicates only if an active request exists (pending/upcoming/ongoing)
-    const activeExisting = await Request.findOne({
+    // Prevent having more than 2 active requests across all mentors
+    const activeCount = await Request.countDocuments({
+      studentId,
+      status: { $in: ["pending", "upcoming", "ongoing"] },
+    });
+
+    if (activeCount >= 2) {
+      return res.status(400).json({
+        message: "You cannot have more than 2 active requests at the same time.",
+      });
+    }
+
+    // Also prevent duplicate active request for the same mentor
+    const exists = await Request.findOne({
       studentId,
       mentorId,
       status: { $in: ["pending", "upcoming", "ongoing"] },

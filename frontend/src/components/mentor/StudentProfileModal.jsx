@@ -1,108 +1,106 @@
 // src/components/student/StudentProfileModal.jsx
-import { motion } from "framer-motion";
-import { User, University, BookOpen, GraduationCap } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { User, University, BookOpen, GraduationCap, X, Mail } from "lucide-react";
 import Spinner from "../../components/Spinner";
+import { faculties } from "../../constants/systemData"; // Import your constant
 
-function Info({ label, value, icon: Icon }) {
+// Helper to match the MentorRequests logic
+const getFacultyName = (key) => {
+  if (!key) return "—";
+  const faculty = faculties.find((f) => f.key === key);
+  return faculty ? faculty.name : key.replace(/_/g, " ");
+};
+
+export default function StudentProfileModal({ open, loading, profile, onClose }) {
   return (
-    <div className="mb-2 flex items-start gap-2">
-      {Icon && <Icon className="w-4 h-4 text-sky-400 mt-[2px]" />}
-      <div>
-        <p className="text-[11px] text-slate-400">{label}</p>
-        <p className="text-sm text-slate-200 font-medium">{value || "—"}</p>
-      </div>
-    </div>
-  );
-}
-
-export default function StudentProfileModal({
-  open,
-  loading,
-  profile,
-  onClose,
-}) {
-  if (!open) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="
-          w-full max-w-md rounded-2xl bg-slate-950
-          border border-slate-800 shadow-2xl p-6 text-slate-50
-        "
-      >
-        {/* HEADER */}
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-              Student Profile
-            </p>
-
-            <h2 className="text-xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-2">
-              <User className="w-5 h-5 text-sky-400" />
-              {profile?.user?.fullName || profile?.fullName || "Student"}
-            </h2>
-
-            <p className="text-xs text-slate-400 mt-1">
-              {profile?.user?.email || profile?.email || ""}
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 text-lg"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-md p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-md rounded-[2.5rem] bg-card border border-border/50 shadow-2xl p-8 relative overflow-hidden"
           >
-            ✕
-          </button>
-        </div>
-
-        {/* BODY */}
-        {loading ? (
-          <div className="py-6 flex items-center gap-2 text-xs text-slate-400">
-            <Spinner className="border-white/60" />
-            <span>Loading student details…</span>
-          </div>
-        ) : profile ? (
-          <div className="space-y-4 text-xs">
-            {/* INFO GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Info
-                label="University"
-                value={profile.university}
-                icon={University}
-              />
-              <Info label="Major" value={profile.major} icon={BookOpen} />
-              <Info
-                label="Semester"
-                value={profile.semester}
-                icon={GraduationCap}
-              />
+            {/* Header: Name Only */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
+                  <User size={24} />
+                </div>
+                <h2 className="text-xl font-bold text-foreground/90 tracking-tight">
+                  {profile?.user?.fullName || profile?.fullName || "Student Identity"}
+                </h2>
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-foreground/5 rounded-xl text-foreground/30 transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
-            {/* ABOUT SECTION */}
-            {profile.about && (
-              <div>
-                <p className="text-slate-400 text-[11px] mb-1">About</p>
-                <p className="leading-relaxed text-slate-100 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
-                  {profile.about}
-                </p>
+            {loading ? (
+              <div className="py-12 flex flex-col items-center gap-3">
+                <Spinner className="border-cyan-500" />
+                <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-black">Syncing Dossier...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Unified Data Section */}
+                <div className="p-5 rounded-[2rem] bg-foreground/[0.02] border border-border/40 space-y-4">
+                  {/* Email */}
+                  <div className="flex items-center gap-3">
+                    <Mail size={14} className="text-cyan-500/50" />
+                    <p className="text-sm font-medium text-foreground/70 italic">
+                        {profile?.user?.email || profile?.email || "No Email Provided"}
+                    </p>
+                  </div>
+                  
+                  <div className="h-px bg-border/40 w-full" />
+
+                  {/* University, Faculty, Semester Grouped */}
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex items-center gap-3">
+                      <University size={14} className="text-cyan-500/50" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground/60">
+                        {profile?.university || "No University"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <BookOpen size={14} className="text-cyan-500/50" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground/60">
+                        {/* Uses the same helper as MentorRequests */}
+                        {getFacultyName(profile?.faculty)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <GraduationCap size={14} className="text-cyan-500/50" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground/60">
+                        Semester {profile?.semester || "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* About Section */}
+                {profile?.about && (
+                  <div className="px-1">
+                    <p className="text-[10px] uppercase tracking-widest font-black text-foreground/30 mb-2 text-center">Summary</p>
+                    <p className="text-[13px] leading-relaxed text-foreground/60 italic font-serif text-center">
+                        "{profile.about}"
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-
-            
-          </div>
-        ) : (
-          <p className="py-4 text-xs text-slate-400">
-            Could not load student profile.
-          </p>
-        )}
-      </motion.div>
-    </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
