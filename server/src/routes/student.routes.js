@@ -35,29 +35,38 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
     // Include only verified mentors and relevant fields
     const mentors = mentorProfiles
       .filter((m) => m.user?.status === "verified" && m.user?.role === "mentor")
-      .map((m) => ({
-        _id: m._id,
-        user: m.user,
-        institution: m.institution,
-        faculty: m.faculty,
-        department: m.department,
-        bio: m.bio,
-        yearsOfExperience: m.yearsOfExperience ?? 0, // ✅ ensure it always exists
-        expertiseAreas: m.expertiseAreas,
-        availability: m.availability || [],
-        // rating metadata
-        averageRating: m.averageRating || 0,
-        totalRatings: m.totalRatings || 0,
-        percentPositive: (() => {
-          try {
-            const arr = m.ratings || [];
-            if (!arr.length) return 0;
-            const ok = arr.filter((r) => (r.score || 0) >= 4).length;
-            return Math.round((ok / arr.length) * 100);
-          } catch (e) { return 0; }
-        })(),
-        badge: m.averageRating ? (m.badge || "—") : "—",
-      }));
+      .map((m) => {
+        const user = m.user ? { ...m.user } : null;
+        if (user && (!user.university || user.university === "")) {
+          user.university = m.institution || "";
+        }
+
+        return {
+          _id: m._id,
+          user,
+          institution: m.institution,
+          faculty: m.faculty,
+          department: m.department,
+          bio: m.bio,
+          yearsOfExperience: m.yearsOfExperience ?? 0, // ✅ ensure it always exists
+          expertiseAreas: m.expertiseAreas,
+          availability: m.availability || [],
+          // rating metadata
+          averageRating: m.averageRating || 0,
+          totalRatings: m.totalRatings || 0,
+          percentPositive: (() => {
+            try {
+              const arr = m.ratings || [];
+              if (!arr.length) return 0;
+              const ok = arr.filter((r) => (r.score || 0) >= 4).length;
+              return Math.round((ok / arr.length) * 100);
+            } catch (e) {
+              return 0;
+            }
+          })(),
+          badge: m.averageRating ? (m.badge || "—") : "—",
+        };
+      });
 
     res.json({ mentorshipAreas, mentors });
   } catch (err) {

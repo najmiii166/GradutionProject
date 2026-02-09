@@ -13,7 +13,7 @@ export default function RequestsPanel({
     setActiveFilter,
     navigate,
 }) {
-    const upcomingRequests = requests.filter((r) => ["upcoming", "ongoing"].includes(r.status));
+    const activeRequests = requests.filter((r) => ["pending", "upcoming", "ongoing"].includes(r.status));
 
     const filteredList = requests.filter(r => {
         if (activeFilter === "upcoming") return ["upcoming", "ongoing"].includes(r.status);
@@ -35,7 +35,7 @@ export default function RequestsPanel({
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-tighter bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm shadow-cyan-500/10">
-                        Active: {upcomingRequests.length}/2
+                        Active: {activeRequests.length}/2
                     </p>
                 </div>
             </div>

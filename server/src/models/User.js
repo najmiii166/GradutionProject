@@ -14,6 +14,10 @@ const UserSchema = new mongoose.Schema(
       default: "pending",
     },
     verifiedAt: { type: Date },
+    resetPassword: {
+      token: String,
+      expiresAt: Date,
+    },
   },
   { timestamps: true }
 );
