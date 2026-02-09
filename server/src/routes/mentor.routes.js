@@ -10,6 +10,7 @@ import User from "../models/User.js";
 import MentorProfile from "../models/MentorProfile.js";
 import StudentProfile from "../models/StudentProfile.js";
 import Request from "../models/Request.js";
+// Use Node's built-in fetch (Node 18+)
 
 const router = express.Router();
 
@@ -398,6 +399,140 @@ router.get("/stats", (req, res) =>
   res.json({ averageRating: 0, totalRatings: 0, credits: 0, badge: "—" })
 );
 router.get("/sessions/upcoming", (req, res) => res.json([]));
+
+/* =======================================================
+   AI SUMMARY FOR A REQUEST
+   GET /api/mentor/requests/:requestId/ai-summary
+   - Auth: mentor only
+   - Authorization: mentor must own the request
+   - Returns strict JSON { summary, keyPoints[], difficulty, suggestedAgenda[] }
+   - Rate limit: 5 requests per mentor per 10 minutes (in-memory)
+======================================================== */
+const aiSummaryRate = new Map(); // mentorUserId -> { windowStart, count }
+
+router.get("/requests/:requestId/ai-summary", auth, requireRole("mentor"), async (req, res) => {
+  try {
+    const mentorUserId = req.user.id;
+    const requestId = req.params.requestId;
+
+    const request = await Request.findById(requestId).lean();
+    if (!request) return res.status(404).json({ message: "Request not found" });
+
+    // Ensure the authenticated mentor owns this request (mentorId references MentorProfile)
+    const mentorProfile = await MentorProfile.findOne({ user: mentorUserId }).lean();
+    if (!mentorProfile) return res.status(403).json({ message: "Mentor profile not found" });
+    if (String(request.mentorId) !== String(mentorProfile._id)) {
+      return res.status(403).json({ message: "Not authorized for this request" });
+    }
+
+    // Simple in-memory rate limit: 5 per 10 minutes
+    const now = Date.now();
+    const wnd = aiSummaryRate.get(mentorUserId) || { windowStart: now, count: 0 };
+    const tenMin = 10 * 60 * 1000;
+    if (now - wnd.windowStart > tenMin) {
+      wnd.windowStart = now;
+      wnd.count = 0;
+    }
+    if (wnd.count >= 5) {
+      return res.status(429).json({ message: "Rate limit exceeded. Try again later." });
+    }
+    wnd.count += 1;
+    aiSummaryRate.set(mentorUserId, wnd);
+
+    const q = request.questionnaire || {};
+    const slot = request.slot || {};
+    const prompt = {
+      reason: String(q.reason || "").trim(),
+      goals: Array.isArray(q.goals) ? q.goals.slice(0, 8) : [],
+      sessionGoal: String(q.sessionGoal || "").trim(),
+      experienceLevel: String(q.experienceLevel || "").trim(),
+      slot: {
+        day: String(slot.day || "").trim(),
+        from: String(slot.from || "").trim(),
+        to: String(slot.to || "").trim(),
+      },
+    };
+
+    // Try Gemini; fall back deterministically if unavailable or errors
+    const apiKey = process.env.GEMINI_API_KEY;
+    let result = null;
+    if (apiKey) {
+      try {
+        const system = `Respond with STRICT JSON only. Do NOT invent content. Rules:\n- summary: 1-3 sentences paraphrasing ONLY student's provided text (reason + sessionGoal).\n- keyPoints: derived ONLY from provided goals (and sessionGoal if present).\n- difficulty: MUST mirror experienceLevel exactly (beginner|intermediate|advanced).\n- suggestedAgenda: MUST be an empty array [].`;
+        const userText = `Student request data (use extractive summarization only):\n${JSON.stringify(prompt, null, 2)}\nReturn ONLY JSON with keys {summary, keyPoints, difficulty, suggestedAgenda}.`;
+        const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: system + "\n" + userText }] },
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 512,
+            },
+          }),
+        });
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+        try {
+          const parsed = JSON.parse(text);
+          // Enforce extractive-only output regardless of model response
+          if (parsed && typeof parsed === "object") {
+            result = {
+              summary: buildSummaryStrict(prompt),
+              keyPoints: buildKeyPointsStrict(prompt),
+              difficulty: difficultyStrict(q.experienceLevel),
+              suggestedAgenda: [],
+            };
+          }
+        } catch (e) {
+          // fall through to fallback
+        }
+      } catch (err) {
+        // fall through to fallback
+      }
+    }
+
+    if (!result) {
+      // Deterministic fallback (extractive-only)
+      const level = difficultyStrict(q.experienceLevel);
+      result = {
+        summary: buildSummaryStrict(prompt),
+        keyPoints: buildKeyPointsStrict(prompt),
+        difficulty: level,
+        suggestedAgenda: [],
+      };
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error("AI summary error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+function difficultyStrict(experienceLevel = "") {
+  const v = String(experienceLevel || "").toLowerCase();
+  if (["beginner", "intermediate", "advanced"].includes(v)) return v;
+  return "unknown";
+}
+
+function buildSummaryStrict(p) {
+  const parts = [];
+  if (p.reason) parts.push(p.reason.trim());
+  if (p.sessionGoal) parts.push(`Focus: ${p.sessionGoal.trim()}`);
+  // Keep strictly to student text; avoid adding derived content
+  const s = parts.join(". ");
+  return s.length ? s.slice(0, 500) : "";
+}
+
+function buildKeyPointsStrict(p) {
+  const out = [];
+  if (p.sessionGoal) out.push(p.sessionGoal.trim());
+  if (Array.isArray(p.goals)) out.push(...p.goals.map((g) => String(g).trim()).slice(0, 5));
+  return out.slice(0, 5);
+}
 router.get("/conversations", (req, res) => res.json([]));
 router.get("/conversations/:id/messages", (req, res) => res.json([]));
 
