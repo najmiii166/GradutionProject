@@ -29,6 +29,9 @@ import supportRoutes from "./routes/support.routes.js";
 import adminTicketsRoutes from "./routes/admin.tickets.js";
 import enrollmentsRoutes from "./routes/enrollments.routes.js";
 import sessionsRoutes from "./routes/sessions.routes.js";
+import recommendationsRoutes from "./routes/recommendations.routes.js";
+// AI routes removed
+import feedbackRoutes from "./routes/feedback.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +58,9 @@ const allowedOrigins = [
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Postman / server-to-server
   try {
+    // Allow any localhost port in dev
+    if (origin.startsWith("http://localhost:")) return true;
+
     if (allowedOrigins.includes(origin)) return true;
     if (origin.endsWith(".vercel.app")) return true;
     // catch other common hosting patterns
@@ -102,6 +108,8 @@ app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminTicketsRoutes);
 app.use("/api/enrollments", enrollmentsRoutes);
 app.use("/api/sessions", sessionsRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 // Debug route: returns the request Origin and whether it's allowed by CORS.
 // Useful for remote debugging when browser shows CORS errors.

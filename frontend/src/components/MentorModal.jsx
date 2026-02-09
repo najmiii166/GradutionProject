@@ -8,6 +8,7 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [sending, setSending] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const [questionnaire, setQuestionnaire] = useState({
     reason: "",
@@ -31,6 +32,7 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
   const handleSubmitRequest = async () => {
     if (disabled || !validate()) return;
     setSending(true);
+    setErrorMsg("");
     try {
       await api.post("/requests", {
         mentorId: mentor._id,
@@ -41,6 +43,13 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
       onClose();
     } catch (err) {
       console.error("Request Error:", err);
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message || "Failed to send request.";
+      if (status === 409) {
+        setErrorMsg(msg || "You already have an active request with this mentor.");
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setSending(false);
     }
@@ -104,6 +113,14 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
                   </div>
                 </div>
               </div>
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <p className="text-[11px] text-rose-400 font-semibold">
+                    {errorMsg} — Manage your existing request in the Requests panel.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-3">
   <label className="text-[10px] uppercase tracking-widest font-bold text-foreground/40 flex items-center gap-2 px-1">

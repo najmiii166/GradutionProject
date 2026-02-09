@@ -20,6 +20,15 @@ export async function finalizeSessionsJob() {
         `[JOB] ${s._id} ${s.status} → ${newStatus}`
       );
       s.status = newStatus;
+      // Compute no-show status when ending (completed or expired)
+      if (newStatus === "completed" || newStatus === "expired") {
+        const mentorJoined = s.mentorJoined === true;
+        const studentJoined = s.studentJoined === true;
+        if (mentorJoined && studentJoined) s.noShowStatus = "none";
+        else if (mentorJoined && !studentJoined) s.noShowStatus = "student_no_show";
+        else if (!mentorJoined && studentJoined) s.noShowStatus = "mentor_no_show";
+        else s.noShowStatus = "both_no_show";
+      }
       await s.save();
     }
   }

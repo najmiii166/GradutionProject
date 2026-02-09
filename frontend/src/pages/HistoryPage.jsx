@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "../api/axios";
 import { motion } from "framer-motion";
+import FeedbackModal from "../components/FeedbackModal";
+import FeedbackListModal from "../components/FeedbackListModal";
 import {
   History,
   CheckCircle,
@@ -28,6 +30,8 @@ export default function HistoryPage() {
   const [data, setData] = useState({});
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [openFeedbackSession, setOpenFeedbackSession] = useState(null);
+  const [openFeedbackListSession, setOpenFeedbackListSession] = useState(null);
 
   /* ---------------- LOAD HISTORY ---------------- */
   useEffect(() => {
@@ -165,19 +169,43 @@ export default function HistoryPage() {
                         </div>
 
                         {/* STATUS */}
-                        <div
-                          className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold ${
-                            completed
-                              ? "bg-emerald-500/15 text-emerald-400"
-                              : "bg-rose-500/15 text-rose-400"
-                          }`}
-                        >
-                          {completed ? (
-                            <CheckCircle className="w-4 h-4" />
-                          ) : (
-                            <XCircle className="w-4 h-4" />
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold ${
+                              completed
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : "bg-rose-500/15 text-rose-400"
+                            }`}
+                          >
+                            {completed ? (
+                              <CheckCircle className="w-4 h-4" />
+                            ) : (
+                              <XCircle className="w-4 h-4" />
+                            )}
+                            {completed ? "Completed" : "Expired"}
+                          </div>
+
+                          {s.noShowStatus && s.noShowStatus !== "none" && (
+                            <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                              {s.noShowStatus.replaceAll("_", " ")}
+                            </span>
                           )}
-                          {completed ? "Completed" : "Expired"}
+                          {completed && (
+                            <button
+                              onClick={() => setOpenFeedbackSession(s)}
+                              className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/20 hover:bg-sky-500/25 transition"
+                            >
+                              Leave Feedback
+                            </button>
+                          )}
+                          {completed && (
+                            <button
+                              onClick={() => setOpenFeedbackListSession(s)}
+                              className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-foreground/10 text-foreground/70 border border-foreground/20 hover:bg-foreground/15 transition"
+                            >
+                              View Feedback
+                            </button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -188,6 +216,21 @@ export default function HistoryPage() {
           );
         })}
       </div>
+      {openFeedbackSession && (
+        <FeedbackModal
+          session={openFeedbackSession}
+          onClose={() => setOpenFeedbackSession(null)}
+          onSubmitted={() => {
+            // Optional: could refetch history to reflect any ratings summary elsewhere
+          }}
+        />
+      )}
+      {openFeedbackListSession && (
+        <FeedbackListModal
+          session={openFeedbackListSession}
+          onClose={() => setOpenFeedbackListSession(null)}
+        />
+      )}
     </div>
   );
 }

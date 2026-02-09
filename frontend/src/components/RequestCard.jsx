@@ -1,5 +1,6 @@
 // src/components/student/RequestCard.jsx
 import useCountdown from "../hooks/useCountdown";
+import { isJoinWindowOpen } from "../utils/joinWindow";
 import { MessageCircle, Calendar, ExternalLink, XCircle, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -20,7 +21,9 @@ export default function RequestCard({
 
   const isOngoing = start && end && now >= start && now <= end;
   const effectiveStatus = isOngoing ? "ongoing" : r.status;
-  const canJoin = r.meetingLink && isOngoing;
+  // Strict join window: 5 minutes before start until end (UTC epoch comparisons)
+  const windowOpen = isJoinWindowOpen(r.startTime, r.endTime, 5);
+  const canJoin = Boolean(r.meetingLink) && (typeof r.canJoin === "boolean" ? r.canJoin : windowOpen);
 
   const getStatusStyles = () => {
     switch (effectiveStatus) {
@@ -75,15 +78,21 @@ export default function RequestCard({
         {(effectiveStatus === "upcoming" || effectiveStatus === "ongoing") && (
           <div className="flex gap-2 pt-3 border-t border-white/5">
             {canJoin && (
-              <a
-                href={r.meetingLink}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={async () => {
+                  try {
+                    // Fire-and-forget join tracking; do not block opening link
+                    await api.post(`/requests/${r._id}/join`);
+                  } catch {}
+                  try {
+                    window.open(r.meetingLink, "_blank", "noopener,noreferrer");
+                  } catch {}
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-widest py-2 rounded-xl bg-cyan-500 text-white hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
               >
                 <ExternalLink size={12} />
                 Join
-              </a>
+              </button>
             )}
 
             <button

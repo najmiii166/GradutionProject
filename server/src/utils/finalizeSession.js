@@ -22,7 +22,10 @@ export function finalizeSession(session, now = new Date()) {
   }
 
   // After session end
-  if (session.mentorJoined === true) {
+  const mentorJoined = session.mentorJoined === true;
+  const studentJoined = session.studentJoined === true;
+
+  if (mentorJoined && studentJoined) {
     return "completed";
   }
 

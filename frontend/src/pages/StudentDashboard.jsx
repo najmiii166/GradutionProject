@@ -16,7 +16,10 @@ import SettingsModal from "../components/student/SettingsModal";
 
 import useStudentNotifications from "../hooks/useStudentNotifications";
 import { formatSessionInfo } from "../utils/student";
-import { ShieldCheck, Zap } from "lucide-react";
+import { ShieldCheck, Zap, ListChecks } from "lucide-react";
+import Button from "../components/Button";
+import Spinner from "../components/Spinner";
+import { getMentorRecommendations } from "../api/recommendationsApi";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -62,6 +65,9 @@ export default function StudentDashboard() {
   const [enrollLoading, setEnrollLoading] = useState(true);
 
   const [notifications, setNotifications] = useStudentNotifications(setRequests);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recError, setRecError] = useState("");
+  const [recommendations, setRecommendations] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -131,6 +137,25 @@ export default function StudentDashboard() {
 
   const activeCount = upcomingRequests.length;
 
+  const onGetRecommendations = async () => {
+    setRecError("");
+    setRecLoading(true);
+    try {
+      const data = await getMentorRecommendations({});
+      // data: { studentId, recommended }
+      setRecommendations(Array.isArray(data?.recommended) ? data.recommended : []);
+      if ((data?.recommended || []).length === 0) {
+        setToast("No recommendations found right now.");
+      }
+    } catch (err) {
+      const msg = err?.message || "Failed to get recommendations";
+      setRecError(msg);
+      setToast(msg);
+    } finally {
+      setRecLoading(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors duration-300 overflow-x-hidden">
       {/* Dynamic Background Gradients */}
@@ -182,6 +207,67 @@ export default function StudentDashboard() {
           rejectedCount={rejectedRequests.length} 
         />
 
+        {/* Recommended Mentors Section */}
+        <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-xl p-6 shadow-xl transition-colors duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-500">
+                <ListChecks size={16} />
+              </div>
+              <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/80">
+                Recommended <span className="text-cyan-500 italic font-serif lowercase tracking-normal text-base font-medium">Mentors.</span>
+              </h2>
+            </div>
+            <Button variant="outline" onClick={onGetRecommendations} loading={recLoading}>
+              Get Recommendations
+            </Button>
+          </div>
+
+          {/* States */}
+          {recLoading && (
+            <div className="flex items-center gap-2 text-sm text-foreground/60">
+              <Spinner />
+              <span>Fetching recommendations…</span>
+            </div>
+          )}
+          {!recLoading && recError && (
+            <div className="text-sm text-red-500">{recError}</div>
+          )}
+          {!recLoading && !recError && recommendations.length === 0 && (
+            <div className="text-xs text-foreground/40 uppercase tracking-widest font-bold border border-dashed border-border/50 rounded-xl p-4 text-center">
+              No recommendations yet
+            </div>
+          )}
+
+          {!recLoading && !recError && recommendations.length > 0 && (
+            <ul className="space-y-3">
+              {recommendations.slice(0, 10).map((r, idx) => {
+                const mentorId = String(r.mentorId || "");
+                // Try to resolve mentor name from existing mentors list (when available)
+                const found = mentors.find((m) => String(m?.user?._id) === mentorId || String(m?._id) === mentorId);
+                const name = found?.user?.fullName || found?.fullName || mentorId;
+                const percent = Math.round((Number(r.score) || 0) * 100);
+                const reasons = Array.isArray(r.reasons) ? r.reasons.slice(0, 3) : [];
+                return (
+                  <li key={mentorId + idx} className="rounded-xl border border-border/40 bg-background/40 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold truncate">{name}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-cyan-500">
+                        {percent}% match
+                      </div>
+                    </div>
+                    <ul className="mt-2 text-xs text-foreground/60 list-disc list-inside space-y-1">
+                      {reasons.map((reason, i) => (
+                        <li key={i}>{reason}</li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
               <MentorsPanel mentors={mentors} loading={loading} onSelect={(m) => setSelectedMentor(m)} />
@@ -207,7 +293,12 @@ export default function StudentDashboard() {
           mentor={selectedMentor} 
           onClose={() => setSelectedMentor(null)} 
           onRequestSent={handleRequestSent} 
-          disabled={activeCount >= 2} 
+          disabled={
+            activeCount >= 2 ||
+            upcomingRequests.some(
+              (r) => String(r.mentorId?._id || r.mentorId) === String(selectedMentor._id)
+            )
+          } 
         />
       )}
 

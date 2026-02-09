@@ -11,6 +11,7 @@ import Spinner from "../Spinner";
 import { api } from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
+import { isJoinWindowOpen, getJoinWindowState } from "../../utils/joinWindow";
 
 const isValidMeetLink = (link) =>
   /^https:\/\/meet\.google\.com\/[a-z-]+$/i.test(link);
@@ -70,13 +71,16 @@ function SessionItem({
   onChat,
   onViewStudent,
 }) {
-  const { label, isOngoing } = useSessionCountdown(
+  const { label } = useSessionCountdown(
     s.startTime,
     s.endTime
   );
 
+  // Strict join window: visible from 5 minutes before start until end
+  const windowOpen = typeof s.canJoin === "boolean" ? s.canJoin : isJoinWindowOpen(s.startTime, s.endTime, 5);
+  const joinState = getJoinWindowState(s.startTime, s.endTime, 5);
   const showJoin =
-    isOngoing &&
+    windowOpen &&
     s.meetingLink &&
     ["upcoming", "ongoing"].includes(s.status);
 
@@ -97,24 +101,28 @@ function SessionItem({
           </p>
         </div>
 
-        {showJoin && (
-         <button
-    onClick={async () => {
-      try {
-        // 1️⃣ Notify backend mentor joined
-        await api.post(`/requests/${s._id}/join`);
-
-        // 2️⃣ Open Google Meet
-        window.open(s.meetingLink, "_blank", "noopener,noreferrer");
-      } catch (err) {
-        console.error("Failed to join session", err);
-      }
-    }}
-    className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
-  >
-    Join Session
-    <ExternalLink className="w-3 h-3" />
-  </button>
+        {showJoin ? (
+          <button
+            onClick={() => {
+              try {
+                const win = window.open(s.meetingLink, "_blank", "noopener,noreferrer");
+                if (win && typeof win.focus === "function") win.focus();
+              } catch {}
+              // Fire-and-forget join tracking; never block navigation
+              try {
+                api.post(`/requests/${s._id}/join`).catch(() => {});
+              } catch {}
+            }}
+            className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
+          >
+            Join Session
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        ) : (
+          // Before window: show disabled join hint; After end: hide join
+          s.meetingLink && joinState === "before" && ["upcoming", "ongoing"].includes(s.status) ? (
+            <span className="text-xs text-slate-400">Available 5 minutes before start</span>
+          ) : null
         )}
       </div>
 

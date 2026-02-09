@@ -116,8 +116,8 @@ export default function AllMentors() {
             className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
           >
             <option value="">University</option>
-            {[...new Set(mentors.map((m) => m.user.university))].map((u) => (
-              <option key={u} value={u}>{u}</option>
+            {[...new Set(mentors.map((m) => m.user?.university).filter(Boolean))].map((u, idx) => (
+              <option key={`${u}-${idx}`} value={u}>{u}</option>
             ))}
           </select>
 
@@ -127,8 +127,8 @@ export default function AllMentors() {
             className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
           >
             <option value="">Availability</option>
-            {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d) => (
-              <option key={d} value={d}>{d}</option>
+            {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d, idx) => (
+              <option key={`${d}-${idx}`} value={d}>{d}</option>
             ))}
           </select>
 
@@ -138,8 +138,8 @@ export default function AllMentors() {
             className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
           >
             <option value="">Experience</option>
-            {[1, 2, 3, 5, 10, 15].map((y) => (
-              <option key={y} value={y}>{y}+ years</option>
+            {[1, 2, 3, 5, 10, 15].map((y, idx) => (
+              <option key={`${y}-${idx}`} value={y}>{y}+ years</option>
             ))}
           </select>
 
@@ -184,7 +184,14 @@ export default function AllMentors() {
           mentor={selectedMentor}
           onClose={() => setSelectedMentor(null)}
           onRequestSent={handleRequestSent}
-          disabled={activeCount >= 2}
+          disabled={
+            activeCount >= 2 ||
+            requests.some(
+              (r) =>
+                ["pending", "upcoming", "ongoing"].includes(r.status) &&
+                String(r.mentorId?._id || r.mentorId) === String(selectedMentor._id)
+            )
+          }
         />
       )}
 
