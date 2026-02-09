@@ -16,7 +16,6 @@ import { api } from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 // Import your existing hook
 import useCountdown from "../../hooks/useCountdown";
-import { useState, useMemo, useEffect } from "react";
 import { isJoinWindowOpen, getJoinWindowState } from "../../utils/joinWindow";
 
 const isValidMeetLink = (link) =>
