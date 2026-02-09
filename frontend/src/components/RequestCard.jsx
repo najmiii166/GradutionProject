@@ -1,6 +1,6 @@
 // src/components/student/RequestCard.jsx
 import useCountdown from "../hooks/useCountdown";
-import { MessageCircle, Calendar, ExternalLink, XCircle, Trash2 } from "lucide-react";
+import { MessageCircle, Calendar, ExternalLink, XCircle, Trash2, User, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function RequestCard({
@@ -20,6 +20,7 @@ export default function RequestCard({
 
   const isOngoing = start && end && now >= start && now <= end;
   const effectiveStatus = isOngoing ? "ongoing" : r.status;
+  // Fixed: Ensure join button shows if link exists and it is currently ongoing
   const canJoin = r.meetingLink && isOngoing;
 
   const getStatusStyles = () => {
@@ -34,101 +35,115 @@ export default function RequestCard({
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      className="relative group p-5 rounded-3xl border border-white/5 bg-white/[0.03] backdrop-blur-md transition-all duration-300 overflow-hidden"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ scale: 1.01 }}
+      className="group relative p-5 rounded-xl border border-border/40 bg-foreground/[0.02] hover:border-cyan-500/40 hover:bg-foreground/[0.04] transition-all duration-300"
     >
-      {/* Refined Glass Glow */}
-      <div className="absolute -inset-px bg-gradient-to-br from-cyan-500/5 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
       <div className="relative z-10">
         {/* HEADER */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 shadow-lg shadow-cyan-500/5 group-hover:scale-105 transition-transform">
-              <Calendar size={18} strokeWidth={1.5} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+              <User size={18} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[13px] font-medium text-foreground/90 tracking-tight truncate leading-none mb-1">
+              <h3 className="text-[13px] font-bold text-foreground/90 truncate leading-none">
                 {r.mentorId?.user?.fullName || "Mentor"}
               </h3>
-              <p className="text-[9px] text-foreground/30 font-bold truncate uppercase tracking-widest">
-                {r.slot?.day} • {r.slot?.from}
+              <p className="text-[9px] text-foreground/30 font-bold uppercase tracking-widest mt-1">
+                {r.mentorId?.expertiseAreas?.[0] || "Authorized Mentor"}
               </p>
             </div>
           </div>
-          
-          <div className={`px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-widest ${getStatusStyles()}`}>
+          <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${getStatusStyles()}`}>
             {effectiveStatus}
           </div>
         </div>
 
-        {/* COUNTDOWN (The "Intelligence" feel) */}
-        {!isOngoing && r.status === "upcoming" && text && text !== "Starting now" && (
-          <div className="mb-4 py-2 px-3 rounded-2xl bg-cyan-500/[0.03] border border-cyan-500/10">
-            <p className="text-[9px] font-bold text-foreground/30 uppercase tracking-[0.2em]">
-              Starts in <span className="text-cyan-400 animate-pulse">{text}</span>
-            </p>
+        {/* TIME & COUNTDOWN SECTION */}
+        {effectiveStatus === "upcoming" || effectiveStatus === "ongoing" ? (
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-foreground/[0.03] border border-border/20">
+              <span className="text-[7px] uppercase text-foreground/30 font-bold tracking-tighter">Schedule</span>
+              <span className="text-[9px] font-bold text-foreground/70 truncate uppercase">
+                {r.slot?.day.slice(0,3)} • {r.slot?.from}-{r.slot?.to}
+              </span>
+            </div>
+            <div className="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-foreground/[0.03] border border-border/20">
+              <span className="text-[7px] uppercase text-foreground/30 font-bold tracking-tighter">Status</span>
+              <span className={`text-[9px] font-bold uppercase truncate ${isOngoing ? "text-emerald-500" : "text-cyan-500/70"}`}>
+                {isOngoing ? "LIVE NOW" : text || "WAITING"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Single simple row for Pending/Rejected */
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-foreground/[0.03] border border-border/20">
+            <Calendar size={12} className="text-foreground/20" />
+            <span className="text-[10px] font-bold text-foreground/50 uppercase">
+              {r.slot?.day} {r.slot?.from} — {r.slot?.to}
+            </span>
           </div>
         )}
 
         {/* ACTIONS */}
-        {(effectiveStatus === "upcoming" || effectiveStatus === "ongoing") && (
-          <div className="flex gap-2 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between pt-4 border-t border-border/30">
+          <div className="flex items-center gap-4">
+            {(effectiveStatus === "upcoming" || effectiveStatus === "ongoing") && (
+              <button
+                onClick={async () => {
+                  try {
+                    const mentorUserId = r.mentorId?.user?._id || r.mentorId?._id;
+                    const { data } = await api.post("/chat/open", {
+                      mentorId: mentorUserId,
+                      studentId: user._id,
+                    });
+                    navigate(`/chat/${data._id}`);
+                  } catch {
+                    setToast("Failed to open chat");
+                  }
+                }}
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors"
+              >
+                <MessageCircle size={14} /> Chat
+              </button>
+            )}
+
             {canJoin && (
               <a
                 href={r.meetingLink}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-widest py-2 rounded-xl bg-cyan-500 text-white hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-500 animate-pulse hover:text-emerald-400 transition-colors"
               >
-                <ExternalLink size={12} />
-                Join
+                <ExternalLink size={14} /> Live Now
               </a>
             )}
-
-            <button
-              onClick={async () => {
-                try {
-                  const mentorUserId = r.mentorId?.user?._id || r.mentorId?._id;
-                  const { data } = await api.post("/chat/open", {
-                    mentorId: mentorUserId,
-                    studentId: user._id,
-                  });
-                  navigate(`/chat/${data._id}`);
-                } catch {
-                  setToast("Failed to open chat");
-                }
-              }}
-              className={`inline-flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-widest py-2 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${canJoin ? 'px-4' : 'flex-1'}`}
-            >
-              <MessageCircle size={12} className="text-cyan-500" />
-              Chat
-            </button>
           </div>
-        )}
 
-        {/* SECONDARY ACTIONS */}
-        {(r.status === "pending" || r.status === "rejected") && (
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center">
             {r.status === "pending" ? (
               <button
                 onClick={() => cancelRequest(r._id)}
-                className="flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-rose-500/40 hover:text-rose-500 transition-colors"
+                className="text-[9px] font-black uppercase tracking-widest text-rose-500/40 hover:text-rose-500 transition-colors"
               >
-                <XCircle size={10} />
                 Cancel
               </button>
-            ) : (
+            ) : r.status === "rejected" ? (
               <button
                 onClick={() => deleteRejected(r._id)}
-                className="flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-foreground/20 hover:text-rose-500 transition-colors"
+                className="text-[9px] font-black uppercase tracking-widest text-foreground/20 hover:text-rose-500 transition-colors"
               >
-                <Trash2 size={10} />
-                Clear
+                Remove
               </button>
+            ) : !canJoin && r.meetingLink && (
+              <span className="text-[7px] font-bold text-foreground/20 uppercase">
+                Join link ready soon
+              </span>
             )}
           </div>
-        )}
+        </div>
       </div>
     </motion.div>
   );

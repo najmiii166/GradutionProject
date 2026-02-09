@@ -3,6 +3,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
@@ -59,11 +60,12 @@ app.use(cors({
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"]
 }));
 
 app.options("*", cors()); // Enable pre-flight for all routes
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -90,7 +92,7 @@ app.use("/api/sessions", sessionsRoutes);
 app.get("/", (_, res) => res.send("MentorLink API Running on Railway 🚀"));
 
 const server = http.createServer(app);
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 const io = new Server(server, {
   path: "/socket.io",
@@ -104,9 +106,20 @@ io.use(socketAuth);
 
 io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
-  const userId = socket.user?._id;
-  if (userId) socket.join(userId.toString());
-  
+
+  // JWT payload (see auth.js) has { id, role, status }.
+  // socketAuth attaches this as socket.user, so prefer .id and
+  // fall back to ._id in case tokens ever change shape.
+  const userId = socket.user?._id || socket.user?.id;
+
+  if (userId) {
+    const room = userId.toString();
+    socket.join(room);
+    console.log("👤 Socket joined user room:", room);
+  } else {
+    console.warn("Socket connected without userId; no user room joined");
+  }
+
   socket.on("disconnect", () => console.log("❌ Socket Disconnected"));
 });
 

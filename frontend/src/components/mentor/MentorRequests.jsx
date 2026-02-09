@@ -3,15 +3,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
   School,
-  CalendarDays,
   Clock,
   GraduationCap,
   BookOpen,
   X,
+  ChevronRight,
+  Activity,
+  Calendar,
+  Zap,
 } from "lucide-react";
 import Spinner from "../Spinner";
 import { faculties } from "../../constants/systemData";
-
 
 const formatTime = (time) => {
   if (!time) return "";
@@ -21,10 +23,6 @@ const formatTime = (time) => {
   return `${h12}:${minutes.toString().padStart(2, "0")} ${period}`;
 };
 
-
-/* ============================
-   Helpers
-============================ */
 const getFacultyName = (key) => {
   if (!key) return "—";
   const faculty = faculties.find((f) => f.key === key);
@@ -48,94 +46,120 @@ export default function MentorRequests({
 
   return (
     <>
-      <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-5 shadow-lg backdrop-blur-lg">
-        <h2 className="text-lg font-semibold text-slate-200 mb-4">
-          Mentorship Requests
-        </h2>
-
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Spinner className="border-white/60" />
-            <span>Loading requests…</span>
+      <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-xl p-6 shadow-xl transition-colors duration-300">
+        
+        {/* Header with Admin-Style Intelligence Branding */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-500">
+              <Activity size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/80">
+                Incoming <span className="text-cyan-500 italic font-serif lowercase tracking-normal text-base font-medium">Requests.</span>
+              </h2>
+            </div>
           </div>
-        ) : !requests || requests.length === 0 ? (
-          <p className="text-sm text-slate-400">No new mentorship requests.</p>
-        ) : (
-          <ul className="space-y-4">
-            {requests.map((r) => {
-              const student = r.studentId || {};
-              const slot = r.slot || {};
 
-              return (
-                <motion.li
-  key={r._id}
-  whileHover={{ scale: 1.01 }}
-  className="rounded-xl bg-slate-800/60 border border-slate-700 p-3 shadow-sm hover:border-sky-500/40 transition"
->
-  {/* HEADER */}
-  <div className="flex items-center gap-2">
-    <User className="w-4 h-4 text-sky-400" />
-    <p className="text-sm font-semibold text-slate-100 truncate">
-      {student.fullName || "Student"}
-    </p>
-  </div>
+          <div className="flex items-center gap-2">
+             <div className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest">
+                  {requests?.length || 0} Pending
+                </p>
+             </div>
+          </div>
+        </div>
 
-  {/* UNIVERSITY + FACULTY */}
-  <div className="mt-1 text-[12px] text-slate-400 flex items-center gap-2">
-    <School className="w-3.5 h-3.5 text-sky-400" />
-    <span className="truncate">
-      {student.university || "—"}
-    </span>
-  </div>
+        {/* Content Area */}
+        <div className="flex-1 min-h-0">
+          {loading ? (
+            <div className="h-40 flex flex-col items-center justify-center gap-3">
+              <Spinner className="border-cyan-500" />
+              <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Loading Requests...</p>
+            </div>
+          ) : !requests || requests.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="h-40 flex items-center justify-center border border-dashed border-border/50 rounded-xl"
+            >
+              <p className="text-[11px] uppercase tracking-widest text-foreground/40 font-bold">
+                No mentorship requests at the moment.
+              </p>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {requests.map((r, idx) => {
+                const student = r.studentId || {};
+                const slot = r.slot || {};
 
-  <div className="mt-1 text-[12px] text-slate-400 flex items-center gap-2">
-    <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-    <span className="truncate">
-      {getFacultyName(student.faculty)}
-    </span>
-  </div>
+                return (
+                  <motion.div
+                    key={r._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="group relative rounded-xl border border-border/40 bg-foreground/[0.02] p-4 hover:border-cyan-500/40 hover:bg-foreground/[0.04] transition-all duration-300"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
+                          <User size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground/90 leading-tight">
+                            {student.fullName || "Student"}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[10px] uppercase tracking-wider text-foreground/40 font-medium">
+                              {student.university || "—"}
+                            </p>
+                            <span className="w-1 h-1 rounded-full bg-border" />
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-cyan-500/60 uppercase">
+                              <Calendar size={10} />
+                              {r.requestedAt ? new Date(r.requestedAt).toLocaleDateString() : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={() => setSelectedRequest(r)}
+                        className="group/btn flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-cyan-500 hover:text-cyan-400 transition-all"
+                      >
+                        Details
+                        <ChevronRight size={12} className="group-hover/btn:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
 
-  {/* SEMESTER + DATE */}
-  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-    <div className="flex items-center gap-1">
-      <GraduationCap className="w-3.5 h-3.5 text-sky-400" />
-      <span>Semester {student.semester || "—"}</span>
-    </div>
+                    <div className="mt-4 flex flex-wrap gap-4 items-center border-t border-border/30 pt-3">
+                      <div className="flex items-center gap-1.5 text-[11px] text-foreground/60">
+                        <BookOpen size={13} className="text-cyan-500/50" />
+                        {getFacultyName(student.faculty)}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-foreground/60">
+                        <GraduationCap size={13} className="text-cyan-500/50" />
+                        Sem {student.semester || "—"}
+                      </div>
+                    </div>
 
-    <span>
-      {r.requestedAt
-        ? new Date(r.requestedAt).toLocaleDateString()
-        : "—"}
-    </span>
-  </div>
-
-  {/* TIME SLOT – HIGHLIGHT */}
-  {slot.day && (
-    <div className="mt-2 rounded-lg bg-slate-900/60 border border-slate-700 px-3 py-2 text-[12px] text-slate-200 flex items-center gap-2">
-      <Clock className="w-4 h-4 text-sky-400" />
-      <span className="font-medium">{slot.day}</span>
-     <span className="text-slate-400">
-  {formatTime(slot.from)} – {formatTime(slot.to)}
-</span>
-
-    </div>
-  )}
-
-  {/* ACTION */}
-  <div className="mt-3 flex justify-end">
-    <button
-      onClick={() => setSelectedRequest(r)}
-      className="text-xs text-sky-300 hover:text-sky-100 hover:underline"
-    >
-      View details →
-    </button>
-  </div>
-</motion.li>
-
-              );
-            })}
-          </ul>
-        )}
+                    {slot.day && (
+                      <div className="mt-3 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70">
+                          <Clock size={12} className="text-cyan-500" />
+                          {slot.day}
+                        </div>
+                        <span className="text-[10px] text-foreground/40 font-medium tracking-tight">
+                          {formatTime(slot.from)} – {formatTime(slot.to)}
+                        </span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ================= MODAL ================= */}
@@ -145,69 +169,73 @@ export default function MentorRequests({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full max-w-xl bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative"
+              className="w-full max-w-xl bg-card border border-border/50 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden"
             >
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                className="absolute top-6 right-6 p-2 rounded-xl hover:bg-foreground/5 text-foreground/30 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X size={20} />
               </button>
 
-              <h3 className="text-lg font-semibold text-slate-100 mb-4">
-                Mentorship Questionnaire
-              </h3>
+              <div className="mb-6">
+                <p className="text-[10px] uppercase tracking-[0.3em] font-black text-cyan-500 mb-1">Mentorship Questionnaire</p>
+               
+              </div>
 
-              <Section title="Motivation">
-                {selectedRequest.questionnaire?.reason ||
-                  "No motivation provided."}
-              </Section>
-
-              <Section title="Goals">
-                {selectedRequest.questionnaire?.goals?.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedRequest.questionnaire.goals.map((g) => (
-                      <span
-                        key={g}
-                        className="px-3 py-1 rounded-full bg-sky-500/20 border border-sky-500/40 text-xs text-sky-200"
-                      >
-                        {g.replace(/_/g, " ")}
-                      </span>
-                    ))}
+              <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                
+                {/* EXPERIENCE LEVEL - Added back with "Skill Vector" styling */}
+                <div className="flex items-center justify-between bg-cyan-500/5 border border-cyan-500/10 rounded-2xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-cyan-500 text-white shadow-lg shadow-cyan-500/20">
+                      <Zap size={14} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest font-black text-foreground/30 leading-none mb-1">Experience Level</p>
+                      <p className="text-sm font-bold text-foreground/80">{selectedRequest.questionnaire?.experienceLevel || "Not Disclosed"}</p>
+                    </div>
                   </div>
-                ) : (
-                  "No goals selected."
-                )}
-              </Section>
-
-              <Section title="Session Focus">
-                {selectedRequest.questionnaire?.sessionGoal ||
-                  "No session focus provided."}
-              </Section>
-
-              <Section title="Experience Level">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  {selectedRequest.questionnaire?.experienceLevel || "—"}
                 </div>
-              </Section>
 
-              <div className="flex justify-end gap-3 mt-6">
+                <Section title="Strategic Motivation">
+                  {selectedRequest.questionnaire?.reason || "No motivation provided."}
+                </Section>
+
+                <Section title="Defined Goals">
+                  {selectedRequest.questionnaire?.goals?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedRequest.questionnaire.goals.map((g) => (
+                        <span key={g} className="px-3 py-1 rounded-lg bg-cyan-500/5 border border-cyan-500/20 text-[10px] font-bold text-cyan-500 uppercase">
+                          {g.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    "No specific goals targeted."
+                  )}
+                </Section>
+
+                <Section title="Session Focus">
+                  {selectedRequest.questionnaire?.sessionGoal || "General Guidance."}
+                </Section>
+              </div>
+
+              <div className="flex gap-3 mt-10">
                 <button
                   onClick={() => {
                     onAction(selectedRequest._id, "reject");
                     setSelectedRequest(null);
                   }}
-                  className="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-500"
+                  className="flex-1 py-3 rounded-xl bg-foreground/[0.03] text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
                 >
-                  Reject
+                  Decline Request
                 </button>
 
                 <button
@@ -215,9 +243,9 @@ export default function MentorRequests({
                     onAction(selectedRequest._id, "accept");
                     setSelectedRequest(null);
                   }}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500"
+                  className="flex-1 py-3 rounded-xl bg-cyan-500 text-white text-[10px] font-semibold uppercase tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-600 transition-all"
                 >
-                  Accept
+                  Accept Request
                 </button>
               </div>
             </motion.div>
@@ -228,28 +256,11 @@ export default function MentorRequests({
   );
 }
 
-/* ---------- Small reusable row ---------- */
-function InfoRow({ icon, label, value }) {
-  return (
-    <div className="flex items-start gap-2">
-      <div className="mt-0.5 text-slate-500">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500">
-          {label}
-        </p>
-        <p className="text-slate-300 break-words line-clamp-2">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function Section({ title, children }) {
   return (
-    <div className="mb-4">
-      <p className="text-sm font-medium text-slate-300 mb-1">{title}</p>
-      <div className="text-sm text-slate-400 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+    <div className="space-y-2">
+      <p className="text-[10px] font-black uppercase tracking-widest text-foreground/30 px-1">{title}</p>
+      <div className="text-[13px] text-foreground/70 bg-foreground/[0.02] border border-border/40 rounded-2xl p-4 leading-relaxed">
         {children}
       </div>
     </div>

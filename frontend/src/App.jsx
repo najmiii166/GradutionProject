@@ -3,6 +3,8 @@
   import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
   import Landing from "./pages/Landing";
   import Login from "./pages/Login";
+  import ForgotPassword from "./pages/ForgotPassword";
+  import ResetPassword from "./pages/ResetPassword";
 
   import StudentRegister from "./pages/StudentRegister";
   import MentorRegister from "./pages/MentorRegister";
@@ -35,11 +37,13 @@
     return (
       <div className="min-h-screen bg-background text-foreground">
       <BrowserRouter>
-      
+        <SocketProvider>
           <Routes>
             {/* Public */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Register */}
             <Route path="/register/student" element={<StudentRegister />} />
@@ -51,17 +55,13 @@
             <Route
               path="/student/dashboard"
               element={
-                <SocketProvider>
                   <StudentDashboard />
-                </SocketProvider>
               }
             />
             <Route
               path="/mentor/dashboard"
               element={
-                <SocketProvider>
                   <MentorDashboard />
-                </SocketProvider>
               }
             />
             <Route path="/mentor/sessions" element={<MentorSessions />} />
@@ -75,17 +75,13 @@
             <Route
               path="/chat"
               element={
-                <SocketProvider>
                   <ChatScreen />
-                </SocketProvider>
               }
             />
             <Route
               path="/chat/:id"
               element={
-                <SocketProvider>
                   <ChatScreen />
-                </SocketProvider>
               }
             />
 
@@ -100,7 +96,7 @@
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-      
+        </SocketProvider>
       </BrowserRouter>
       </div>
     );

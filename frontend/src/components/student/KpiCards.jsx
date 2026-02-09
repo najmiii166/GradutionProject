@@ -4,7 +4,7 @@ import { Users, Clock, Mail, XCircle } from "lucide-react";
 
 export default function KpiCards({ mentorsCount, upcomingCount, pendingCount, rejectedCount }) {
   const cards = [
-    { icon: Users, label: "Connected Mentors", value: mentorsCount, color: "text-cyan-500", glow: "bg-cyan-500/10" },
+    { icon: Users, label: "Matching Mentors", value: mentorsCount, color: "text-cyan-500", glow: "bg-cyan-500/10" },
     { icon: Clock, label: "Upcoming Sessions", value: upcomingCount, color: "text-violet-500", glow: "bg-violet-500/10" },
     { icon: Mail, label: "Pending Requests", value: pendingCount, color: "text-amber-500", glow: "bg-amber-500/10" },
     { icon: XCircle, label: "Rejected Requests", value: rejectedCount, color: "text-rose-500", glow: "bg-rose-500/10" },

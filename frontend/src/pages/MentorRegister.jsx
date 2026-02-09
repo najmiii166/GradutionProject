@@ -1,12 +1,13 @@
-// src/pages/MentorRegister.jsx
-import { useState } from "react";
+//frontend/src/pages/MentorRegister.jsx
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
-import { universities, faculties } from "../constants/systemData";
+import { universities, faculties, DAYS } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
 import Toast from "../components/Toast";
-import { motion } from "framer-motion";
+import ThemeToggle from "../components/ThemeToggle";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
   User,
@@ -18,13 +19,42 @@ import {
   CalendarDays,
   Eye,
   EyeOff,
+  Info,
+  ArrowRight,
+  CheckCircle2,
+  Globe,
+  Linkedin,
+  Twitter,
+  Facebook,
+  FileText,
 } from "lucide-react";
 
-// Strong Password regex
-const strongPasswordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const urlPatterns = {
+  linkedin: /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/,
+  x: /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/,
+  facebook: /^(https?:\/\/)?(www\.)?facebook\.com\/[a-zA-Z0-9.]+\/?$/,
+};
+
+const format12h = (time) => {
+  const [rawHour = "0", rawMinute = "0"] = time.split(":");
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  const paddedMinute = minute.toString().padStart(2, "0");
+  return `${displayHour}:${paddedMinute} ${period}`;
+};
 
 export default function MentorRegister() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [successModal, setSuccessModal] = useState(false);
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -33,399 +63,392 @@ export default function MentorRegister() {
     faculty: "",
     yearsOfExperience: "",
     bio: "",
-    expertiseAreas: "",
   });
 
-  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  const [availability, setAvailability] = useState(
-    DAYS.map((d) => ({
-      day: d,
-      available: false,
-      from: "09:00",
-      to: "17:00",
-    }))
-  );
-
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [successModal, setSuccessModal] = useState(false);
-  const navigate = useNavigate();
   const [selectedFacultyKey, setSelectedFacultyKey] = useState(null);
   const [selectedInstitutionKey, setSelectedInstitutionKey] = useState(null);
   const [selectedSubAreas, setSelectedSubAreas] = useState([]);
-  const [socialLinks, setSocialLinks] = useState({ linkedin: '', website: '' });
+  const [socialLinks, setSocialLinks] = useState({ linkedin: '', website: '', x: '', facebook: '' });
+  
+  const [skipAvailability, setSkipAvailability] = useState(false);
+  
+  const [availability, setAvailability] = useState(
+    DAYS.map((d) => ({ day: d.key, slots: [] }))
+  );
+  const [newSlot, setNewSlot] = useState({ day: DAYS[0].key, from: "09:00", to: "10:00" });
 
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const onInstitutionSelect = (e) => {
-    const key = e.target.value;
-    setSelectedInstitutionKey(key || null);
-    setForm((f) => ({ ...f, institution: key || "" }));
-  };
-
-  
-
-  const toggleDay = (day) => {
-    setAvailability((a) =>
-      a.map((it) => (it.day === day ? { ...it, available: !it.available } : it))
+  // Step 1 Validation & Email Check
+  const isStep1Valid = useMemo(() => {
+    return (
+      form.fullName.trim().length > 2 &&
+      /^\S+@\S+\.\S+$/.test(form.email) &&
+      strongPasswordRegex.test(form.password)
     );
+  }, [form]);
+
+  const handleStep1Submit = async () => {
+    setCheckingEmail(true);
+    try {
+      // Check if email exists
+      await api.post("/auth/check-email", { email: form.email });
+      setStep(2);
+    } catch (err) {
+      setToast(err.response?.data?.message || "Email is already in use");
+    } finally {
+      setCheckingEmail(false);
+    }
   };
 
-  const setDayFrom = (day, value) => {
-    setAvailability((a) =>
-      a.map((it) => (it.day === day ? { ...it, from: value } : it))
-    );
-  };
+  // Step 2 Validation (All fields required)
+  const isStep2Valid = useMemo(() => {
+    const hasBasics = selectedInstitutionKey && selectedFacultyKey && form.yearsOfExperience && form.bio.trim().length > 10;
+    const hasSubAreas = selectedSubAreas.length > 0;
+    const linkedinValid = urlPatterns.linkedin.test(socialLinks.linkedin);
+    const xValid = urlPatterns.x.test(socialLinks.x);
+    const fbValid = urlPatterns.facebook.test(socialLinks.facebook);
+    const webValid = socialLinks.website && socialLinks.website.includes('.');
 
-  const setDayTo = (day, value) => {
-    setAvailability((a) =>
-      a.map((it) => (it.day === day ? { ...it, to: value } : it))
-    );
-  };
+    // Require at least one valid social/profile link (linkedin, x, facebook, or website)
+    const socialValid = linkedinValid || xValid || fbValid || webValid;
 
-  const submit = async (e) => {
-    e.preventDefault();
-    // Validate required fields (faculty is selectedFacultyKey)
-    if (!String(form.fullName || "").trim()) return setToast('Please fill the required field: fullName');
-    if (!String(form.email || "").trim()) return setToast('Please fill the required field: email');
-    if (!String(form.password || "").trim()) return setToast('Please fill the required field: password');
-    if (!selectedInstitutionKey) return setToast('Please select an Institution');
-    if (!selectedFacultyKey) return setToast('Please select a Faculty');
+    return hasBasics && hasSubAreas && socialValid;
+  }, [selectedInstitutionKey, selectedFacultyKey, form.yearsOfExperience, form.bio, selectedSubAreas, socialLinks]);
 
-    if (!strongPasswordRegex.test(form.password))
-      return setToast(
-        "Password must be 8+ chars and include upper, lower, number & symbol"
-      );
+  // Step 3 Validation
+  const isStep3Valid = useMemo(() => {
+    return skipAvailability || availability.some((d) => d.slots.length > 0);
+  }, [skipAvailability, availability]);
 
-    // mentors provide `institution` only (no university select)
+  const handleAddSlot = () => {
+    if (skipAvailability) setSkipAvailability(false);
 
-    // require at least one social profile (LinkedIn or Portfolio)
-    const providedSocial = Object.values(socialLinks).map(s => (s || '').trim()).filter(Boolean);
-    if (providedSocial.length === 0) return setToast('Please provide at least one social profile URL (LinkedIn or Portfolio)');
-    // validate URLs (add https:// if missing)
-    for (const raw of providedSocial) {
-      let url = raw;
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      try {
-        new URL(url);
-      } catch (err) {
-        return setToast('Invalid social URL: ' + raw);
-      }
+    const toMinutes = (time) => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const start = toMinutes(newSlot.from);
+    const end = toMinutes(newSlot.to);
+
+    if (start >= end) {
+      setToast("End time must be after start time");
+      return;
     }
 
-    setLoading(true);
+    const dayEntry = availability.find((d) => d.day === newSlot.day);
+    const hasOverlap = dayEntry?.slots.some((slot) => {
+      const slotStart = toMinutes(slot.from);
+      const slotEnd = toMinutes(slot.to);
+      return start < slotEnd && end > slotStart;
+    });
 
+    if (hasOverlap) {
+      setToast("This time slot overlaps with another!");
+      return;
+    }
+
+    setAvailability((prev) =>
+      prev.map((d) => {
+        if (d.day !== newSlot.day) return d;
+        const slot = { id: crypto.randomUUID(), from: newSlot.from, to: newSlot.to };
+        return { ...d, slots: [...d.slots, slot] };
+      })
+    );
+
+    setNewSlot((slot) => ({ ...slot, from: "09:00", to: "10:00" }));
+  };
+
+  const removeSlot = (day, id) => {
+    setAvailability((prev) =>
+      prev.map((d) =>
+        d.day === day ? { ...d, slots: d.slots.filter((s) => s.id !== id) } : d
+      )
+    );
+  };
+
+  const submit = async () => {
+    setLoading(true);
     try {
       const normalizedSocial = {};
-      Object.entries(socialLinks).forEach(([k,v]) => {
-        if (v && String(v).trim()) {
-          let url = String(v).trim();
-          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      
+      Object.entries(socialLinks).forEach(([k, v]) => {
+        const trimmedValue = v.trim();
+        
+        // ONLY add to payload if the user actually typed something
+        if (trimmedValue !== "") {
+          let url = trimmedValue;
+          // Only prepend https:// if it doesn't already have a protocol
+          if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+          }
           normalizedSocial[k] = url;
+        } else {
+          // Explicitly set as empty string so backend doesn't receive "https://"
+          normalizedSocial[k] = "";
         }
       });
 
       const payload = {
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
+        ...form,
         institution: selectedInstitutionKey,
+        university: selectedInstitutionKey,
         faculty: selectedFacultyKey,
-        // department removed; institution is authoritative
         yearsOfExperience: Number(form.yearsOfExperience || 0),
-        bio: form.bio,
-        expertiseAreas: Array.isArray(selectedSubAreas) ? selectedSubAreas : [],
-        socialLinks: normalizedSocial,
-        availability: availability
-          .filter((d) => d.available)
-          .map(({ day, from, to }) => ({ day, from, to })),
+        expertiseAreas: selectedSubAreas,
+        socialLinks: normalizedSocial, // Now contains clean data
+        availability: skipAvailability ? [] : availability.flatMap(d => d.slots.map(({from, to}) => ({ day: d.day, from, to }))),
       };
 
       await api.post("/auth/register/mentor", payload);
-
       setSuccessModal(true);
-      setForm({
-        fullName: "",
-        email: "",
-        password: "",
-        institution: "",
-        faculty: "",
-        yearsOfExperience: "",
-        bio: "",
-        expertiseAreas: "",
-      });
-      setSelectedFacultyKey(null);
-      setSelectedInstitutionKey(null);
-      setSelectedSubAreas([]);
-      setSocialLinks({ linkedin: '', website: '' });
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.errors?.[0]?.msg ||
-        "Registration failed";
-      setToast(msg);
+      setToast(err.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }
   };
-
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center overflow-hidden p-6">
+    <div className="relative min-h-screen bg-background text-foreground flex items-center justify-center p-6 transition-colors duration-300">
+      <header className="fixed top-0 w-full z-50 backdrop-blur-md border-b border-border/40">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Brand />
+          <ThemeToggle />
+        </div>
+      </header>
 
-      {/* Animated gradient blobs */}
-      <motion.div
-        className="absolute top-0 left-[-100px] h-[300px] w-[300px] bg-blue-400/30 blur-[100px] rounded-full"
-        animate={{ y: [0, 30, 0] }}
-        transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute bottom-0 right-[-100px] h-[300px] w-[300px] bg-indigo-400/30 blur-[100px] rounded-full"
-        animate={{ y: [0, -30, 0] }}
-        transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
-      />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xl mt-16">
+        <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-muted">
+            <motion.div className="h-full bg-primary" animate={{ width: `${(step / 3) * 100}%` }} />
+          </div>
 
-      {/* Card Wrapper */}
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 w-full max-w-xl"
-      >
-        <Brand className="mb-5 text-center" />
-        <div className="rounded-2xl bg-white/70 backdrop-blur-md border border-slate-200 shadow-xl p-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-1 text-center">
-            Mentor Registration 🧑‍🏫
-          </h1>
-          <p className="text-sm text-gray-600 text-center mb-8">
-            Join as a mentor to support students.
-          </p>
+          <div className="mb-8">
+            <h1 className="text-3xl font-light tracking-tight">
+              Mentor <span className="italic font-serif text-primary">Registration.</span>
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : "Working Hours"}</p>
+          </div>
 
-          {/* FORM */}
-          <form className="space-y-4" onSubmit={submit}>
-            {/* ICON INPUT COMPONENTS */}
-            {[
-              { icon: User, name: "fullName", placeholder: "Full Name" },
-              { icon: Mail, name: "email", type: "email", placeholder: "Email address" },
-              { icon: Building2, name: "institution", placeholder: "Institution" },
-              { icon: BookMarked, name: "faculty", placeholder: "Faculty" },
-              { icon: Briefcase, name: "yearsOfExperience", type: "number", placeholder: "Years of Experience" },
-            ].map((f, i) => (
-              <div className="relative" key={i}>
-                <f.icon className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-                {f.name === 'institution' ? (
-                  <div>
-                    <select
-                      name={f.name}
-                      value={selectedInstitutionKey || ""}
-                      onChange={onInstitutionSelect}
-                      required={i < 4}
-                      className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    >
-                      <option value="">Select Institution</option>
-                      {universities.map((u) => (
-                        <option key={u.key} value={u.key}>{u.name}</option>
-                      ))}
-                    </select>
+          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+            <AnimatePresence mode="wait">
+              {step === 1 && (
+                <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-4">
+                  <div className="relative">
+                    <User className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <input name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
                   </div>
-                ) : f.name === 'faculty' ? (
-                  <div>
-                    <select
-                      name={f.name}
-                      value={selectedFacultyKey || ""}
-                      onChange={(e) => setSelectedFacultyKey(e.target.value || null)}
-                      required={i < 4}
-                      className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    >
-                      <option value="">Select Faculty</option>
-                      {faculties.map((fac) => (
-                        <option key={fac.key} value={fac.key}>{fac.name}</option>
-                      ))}
-                    </select>
-
-                    {/* show sub-area checkboxes immediately under faculty select */}
-                    {selectedFacultyKey ? (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-sm text-slate-600">Select expertise areas</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
-                            <label key={sub.key} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded text-sm">
-                              <input
-                                type="checkbox"
-                                checked={selectedSubAreas.includes(sub.key)}
-                                onChange={(e) => {
-                                  if (e.target.checked) setSelectedSubAreas((s) => [...s, sub.key]);
-                                  else setSelectedSubAreas((s) => s.filter(x => x !== sub.key));
-                                }}
-                              />
-                              <span>{sub.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <input type="email" name="email" placeholder="Email address" value={form.email} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
                   </div>
-                ) : (
-                  <input
-                    type={f.type || "text"}
-                    name={f.name}
-                    placeholder={f.placeholder}
-                    value={form[f.name]}
-                    onChange={update}
-                    required={i < 4}
-                    className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                  />
-                )}
-              </div>
-            ))}
-
-            {/* PASSWORD */}
-            <div className="relative">
-              <Lock className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                placeholder="Password"
-                value={form.password}
-                onChange={update}
-                required
-                className="w-full rounded-lg border border-gray-300 bg-white/70 pl-10 pr-10 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-
-            {/* BIO */}
-            <textarea
-              name="bio"
-              placeholder="Short Bio"
-              value={form.bio}
-              onChange={update}
-              className="w-full rounded-lg border border-gray-300 bg-white/70 p-3 text-sm text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-400"
-            />
-
-            {/* SOCIAL PROFILES (at least one required) */}
-            <div className="mt-2">
-              <p className="text-sm font-semibold text-gray-700 mb-2">Social profiles (at least one required)</p>
-              <input
-                type="text"
-                name="linkedin"
-                placeholder="LinkedIn profile /Portfolio URL"
-                value={socialLinks.linkedin}
-                onChange={(e) => setSocialLinks(s => ({ ...s, linkedin: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 bg-white/70 p-2 text-sm text-gray-700 placeholder-gray-400 mb-2"
-              />
-              {/* Twitter / TikTok removed — only LinkedIn and Portfolio requested */}
-              <input
-                type="text"
-                name="website"
-                placeholder="Twitter/Tiktok"
-                value={socialLinks.website}
-                onChange={(e) => setSocialLinks(s => ({ ...s, website: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 bg-white/70 p-2 text-sm text-gray-700 placeholder-gray-400"
-              />
-            </div>
-
-            {/* expertise checkboxes moved to render immediately under faculty select */}
-
-            {/* AVAILABILITY SECTION */}
-            <div className="mt-6">
-              <p className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <CalendarDays className="h-4 w-4 text-blue-600" /> Availability
-              </p>
-
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {availability.map((d) => (
-                  <button
-                    type="button"
-                    key={d.day}
-                    onClick={() => toggleDay(d.day)}
-                    className={`px-3 py-1 rounded-md text-center text-sm font-medium transition ${
-                      d.available
-                        ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
-                        : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                    }`}
-                  >
-                    {d.day}
-                  </button>
-                ))}
-              </div>
-
-              {/* Time selector if available */}
-              {availability.some((d) => d.available) && (
-                <div className="space-y-2">
-                  {availability
-                    .filter((d) => d.available)
-                    .map((d) => (
-                      <div key={d.day} className="flex items-center justify-between bg-white/70 border rounded-lg p-3 shadow-sm">
-                        <span className="font-medium text-sm">{d.day}</span>
-                        <div className="flex items-center gap-2">
-                          <input type="time" value={d.from} onChange={(e) => setDayFrom(d.day, e.target.value)} className="border rounded p-1" />
-                          <span className="text-xs text-gray-500">to</span>
-                          <input type="time" value={d.to} onChange={(e) => setDayTo(d.day, e.target.value)} className="border rounded p-1" />
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" value={form.password} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-12 py-3.5 text-sm outline-none" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3.5 text-muted-foreground">
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {!strongPasswordRegex.test(form.password) && form.password.length > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/10 text-[11px] text-primary/80">
+                      <Info size={14} /> Password must be 8+ chars with mix of cases, numbers & symbols.
+                    </div>
+                  )}
+                  <Button onClick={handleStep1Submit} disabled={!isStep1Valid} loading={checkingEmail} variant="primary" className="w-full group">
+                    Continue <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </motion.div>
               )}
-            </div>
 
-            {/* SUBMIT BUTTON */}
-            <Button
-              type="submit"
-              loading={loading}
-              className="w-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 py-2.5 text-white font-semibold shadow-md hover:shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all"
-            >
-              Create mentor account
-            </Button>
+              {step === 2 && (
+                <motion.div key="s2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <select value={selectedInstitutionKey || ""} onChange={(e) => setSelectedInstitutionKey(e.target.value)} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none appearance-none">
+                        <option value="">Institution *</option>
+                        {universities.map(u => <option key={u.key} value={u.key}>{u.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="relative">
+                      <BookMarked className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <select value={selectedFacultyKey || ""} onChange={(e) => setSelectedFacultyKey(e.target.value)} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none appearance-none">
+                        <option value="">Faculty *</option>
+                        {faculties.map(f => <option key={f.key} value={f.key}>{f.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {selectedFacultyKey && (
+                    <div className="p-4 bg-muted/30 rounded-2xl border border-border/50">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Expertise Areas *</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
+                          <label key={sub.key} className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all ${selectedSubAreas.includes(sub.key) ? 'bg-primary/10 border-primary' : 'bg-background border-border hover:border-primary/50'}`}>
+                            <input type="checkbox" checked={selectedSubAreas.includes(sub.key)} onChange={(e) => e.target.checked ? setSelectedSubAreas([...selectedSubAreas, sub.key]) : setSelectedSubAreas(selectedSubAreas.filter(x => x !== sub.key))} className="hidden" />
+                            <span className="text-xs truncate">{sub.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    <Briefcase className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <input type="number" name="yearsOfExperience" placeholder="Years of Experience *" value={form.yearsOfExperience} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
+                  </div>
+
+                  <div className="relative">
+                    <FileText className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <textarea name="bio" placeholder="Professional Bio (Minimum 10 chars) *" value={form.bio} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none min-h-[100px]" />
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <p className="text-xs font-medium text-muted-foreground px-1">Social Profiles (Only one required)</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                       <div className="relative">
+                          <Linkedin className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                          <input placeholder="LinkedIn URL" value={socialLinks.linkedin} onChange={(e) => setSocialLinks({...socialLinks, linkedin: e.target.value})} className={`w-full bg-background/50 border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${socialLinks.linkedin && !urlPatterns.linkedin.test(socialLinks.linkedin) ? 'border-red-500' : 'border-border'}`} />
+                       </div>
+                       <div className="relative">
+                          <Twitter className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                          <input placeholder="X URL" value={socialLinks.x} onChange={(e) => setSocialLinks({...socialLinks, x: e.target.value})} className={`w-full bg-background/50 border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${socialLinks.x && !urlPatterns.x.test(socialLinks.x) ? 'border-red-500' : 'border-border'}`} />
+                       </div>
+                       <div className="relative">
+                          <Facebook className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                          <input placeholder="Facebook URL" value={socialLinks.facebook} onChange={(e) => setSocialLinks({...socialLinks, facebook: e.target.value})} className={`w-full bg-background/50 border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${socialLinks.facebook && !urlPatterns.facebook.test(socialLinks.facebook) ? 'border-red-500' : 'border-border'}`} />
+                       </div>
+                       <div className="relative">
+                          <Globe className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                          <input placeholder="Portfolio/Website" value={socialLinks.website} onChange={(e) => setSocialLinks({...socialLinks, website: e.target.value})} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button onClick={() => setStep(1)} variant="secondary" className="flex-1">Back</Button>
+                    <Button onClick={() => setStep(3)} disabled={!isStep2Valid} variant="primary" className="flex-[2]">Next </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 3 && (
+                <motion.div key="s3" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2 text-sm font-medium"><CalendarDays className="w-4 h-4 text-primary" /> Availability</div>
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Skip for now</span>
+                      <input type="checkbox" checked={skipAvailability} onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSkipAvailability(checked);
+                        if (checked) {
+                          setAvailability((a) => a.map((d) => ({ ...d, slots: [] })));
+                        }
+                      }} className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
+                    </label>
+                  </div>
+
+                  <div className="p-4 bg-muted/30 backdrop-blur-xl border border-border/50 rounded-2xl space-y-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">
+                      Add A Slot
+                    </p>
+                    <div className="grid grid-cols-12 gap-3">
+                      <select
+                        value={newSlot.day}
+                        onChange={(e) => setNewSlot({ ...newSlot, day: e.target.value })}
+                        className="col-span-12 sm:col-span-3 w-full bg-background/50 border border-border rounded-xl px-4 py-3.5 text-sm outline-none"
+                        disabled={skipAvailability}
+                      >
+                        {DAYS.map((day) => (
+                          <option key={day.key} value={day.key}>{day.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="time"
+                        value={newSlot.from}
+                        onChange={(e) => setNewSlot({ ...newSlot, from: e.target.value })}
+                        className="col-span-12 sm:col-span-3 w-full bg-background/50 border border-border rounded-xl px-2 py-3.5 text-[11px] font-mono leading-tight outline-none"
+                        disabled={skipAvailability}
+                      />
+                      <input
+                        type="time"
+                        value={newSlot.to}
+                        onChange={(e) => setNewSlot({ ...newSlot, to: e.target.value })}
+                        className="col-span-12 sm:col-span-3 w-full bg-background/50 border border-border rounded-xl px-2 py-3.5 text-[11px] font-mono leading-tight outline-none"
+                        disabled={skipAvailability}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleAddSlot}
+                        disabled={skipAvailability}
+                        className="col-span-12 sm:col-span-3 w-full rounded-xl py-3.5"
+                      >
+                        Add Slot
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {availability.some((d) => d.slots.length > 0) ? (
+                      availability
+                        .filter((d) => d.slots.length > 0)
+                        .map((d) => (
+                          <div key={d.day} className="space-y-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">
+                              {d.day}
+                            </p>
+                            {d.slots.map((slot) => (
+                              <div key={slot.id} className="flex items-center justify-between p-3 bg-muted/30 border border-border/50 rounded-xl">
+                                <div className="flex items-center gap-2 font-mono text-[11px]">
+                                  <span className="font-mono text-[11px]">{format12h(slot.from)}</span>
+                                  <span className="opacity-40 font-mono text-[10px] tracking-[0.3em]">TO</span>
+                                  <span className="font-mono text-[11px]">{format12h(slot.to)}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeSlot(d.day, slot.id)}
+                                  className="text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                    ) : (
+                      !skipAvailability && (
+                        <p className="text-xs text-muted-foreground px-1">Use the form above to add your first slot.</p>
+                      )
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button onClick={() => setStep(2)} variant="secondary" className="flex-1">Back</Button>
+                    <Button onClick={submit} loading={loading} disabled={!isStep3Valid} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Complete Registration</Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </form>
-
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <a href="/login" className="text-blue-600 font-medium hover:underline">
-              Login
-            </a>
-          </p>
         </div>
       </motion.div>
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
-      {/* SUCCESS MODAL */}
-      {successModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white/90 p-6 rounded-2xl shadow-2xl text-center max-w-sm w-full border border-blue-100"
-          >
-            <h2 className="text-xl font-bold mb-2 text-gray-800">
-              🎉 Registration Successful!
-            </h2>
-            <p className="text-gray-600 text-sm mb-5">
-              Your mentor account was created successfully.
-              <br /> Admin will verify soon.
-            </p>
-
-            <Button
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold"
-              onClick={() => {
-                setSuccessModal(false);
-                navigate("/");
-              }}
-            >
-              OK
-            </Button>
-          </motion.div>
-        </div>
-      )}
+      <AnimatePresence>
+        {successModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card border border-border p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full">
+              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-8 h-8" /></div>
+              <h2 className="text-2xl font-light italic font-serif mb-2">Registration Successful!</h2>
+              <p className="text-muted-foreground text-sm mb-8">Your account has been created. Admin will verify your credentials soon.</p>
+              <Button className="w-full" onClick={() => navigate("/")}>Go to Home</Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

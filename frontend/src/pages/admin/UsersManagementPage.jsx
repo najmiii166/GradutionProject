@@ -1,6 +1,7 @@
 // frontend/src/pages/admin/UsersManagementPage.jsx
 import { motion } from "framer-motion";
 import { UserCheck, UserX, Search, Mail, Calendar, GraduationCap } from "lucide-react";
+import { universities } from "../../constants/systemData";
 
 export default function UsersManagementPage({ users, loading, view, setView }) {
   return (
@@ -100,7 +101,12 @@ export default function UsersManagementPage({ users, loading, view, setView }) {
                     <td className="py-5 px-8 hidden md:table-cell">
                       <div className="flex items-center gap-2 text-xs text-foreground/60">
                         <GraduationCap size={14} className="opacity-30" />
-                        {u.university || u.institution || "—"}
+                        {(() => {
+                          const key = u.university || u.institution || u.profile?.institution || u.mentorProfile?.institution || "";
+                          if (!key) return "Independent";
+                          const match = universities.find((x) => String(x.key) === String(key));
+                          return match?.name || "Independent";
+                        })()}
                       </div>
                     </td>
                     <td className="py-5 px-8 hidden lg:table-cell text-right">

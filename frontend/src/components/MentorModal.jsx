@@ -3,8 +3,9 @@ import { api } from "../api/axios";
 import { Briefcase, Sparkles, Calendar, Info, X, ChevronRight , CheckCircle2} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MentorQuestionnaire from "./MentorQuestionnaire";
+import { universities } from "../constants/systemData";
 
-export default function MentorModal({ mentor, onClose, onRequestSent, disabled }) {
+export default function MentorModal({ mentor, onClose, onRequestSent, disabledGlobal = false, disabledMentor = false }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [sending, setSending] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
@@ -29,7 +30,8 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
   };
 
   const handleSubmitRequest = async () => {
-    if (disabled || !validate()) return;
+    const disabledEffective = disabledGlobal || disabledMentor;
+    if (disabledEffective || !validate()) return;
     setSending(true);
     try {
       await api.post("/requests", {
@@ -95,7 +97,13 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
 </div>
                   <div>
                     <h3 className="text-sm font-bold text-foreground">{mentor.user?.fullName}</h3>
-                    <p className="text-xs text-foreground/50">{mentor.user?.university}</p>
+                    <p className="text-xs text-foreground/50">
+                      {(() => {
+                        const key = mentor.user?.university || mentor.institution || "";
+                        const match = universities.find((u) => String(u.key) === String(key));
+                        return match?.name || "Independent";
+                      })()}
+                    </p>
                     {mentor.yearsOfExperience > 0 && (
                       <p className="flex items-center gap-1 text-[10px] text-cyan-500 font-bold mt-1">
                         <Briefcase size={10} /> {mentor.yearsOfExperience} Years XP
@@ -153,7 +161,7 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
               <div className="flex justify-end pt-4">
                 <button
                   onClick={() => setShowQuestionnaire(true)}
-                  disabled={!selectedSlot || disabled}
+                  disabled={!selectedSlot || disabledGlobal || disabledMentor}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background text-xs font-bold uppercase tracking-widest hover:bg-cyan-500 hover:text-white disabled:opacity-20 transition-all shadow-xl shadow-black/10 active:scale-95"
                 >
                   Configure Request <ChevronRight size={14} />
@@ -171,16 +179,18 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabled }
               setFieldErrors={setFieldErrors}
               sending={sending}
               handleSubmitRequest={handleSubmitRequest}
-              disabled={disabled}
+              disabled={disabledGlobal || disabledMentor}
               onBack={() => setShowQuestionnaire(false)}
             />
           )}
 
-          {disabled && (
+          {(disabledGlobal || disabledMentor) && (
             <div className="mt-6 flex items-center gap-3 p-3 rounded-xl bg-rose-500/5 border border-rose-500/20">
               <Info size={14} className="text-rose-500" />
               <p className="text-[10px] font-bold text-rose-500/80 uppercase tracking-widest">
-                Active Request Limit Reached (2/2)
+                {disabledGlobal
+                  ? 'Active Request Limit Reached (2/2)'
+                  : 'You already have a pending or upcoming request with this mentor'}
               </p>
             </div>
           )}

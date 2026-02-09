@@ -1,7 +1,8 @@
 // src/pages/StudentDashboard.jsx 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, setAuthToken } from "../api/axios";
+import { SocketContext } from "../Contexts/SocketContext";
 import Toast from "../components/Toast";
 import MentorModal from "../components/MentorModal";
 import EditProfileModal from "../components/EditProfileModal";
@@ -12,7 +13,7 @@ import StudentSidebar from "../components/student/StudentSidebar";
 import MentorsPanel from "../components/student/MentorsPanel";
 import RequestsPanel from "../components/student/RequestsPanel";
 import KpiCards from "../components/student/KpiCards";
-import SettingsModal from "../components/student/SettingsModal";
+
 
 import useStudentNotifications from "../hooks/useStudentNotifications";
 import { formatSessionInfo } from "../utils/student";
@@ -46,6 +47,10 @@ export default function StudentDashboard() {
   );
 
   setAuthToken(token);
+
+  // Trigger socket connection implicitly by accessing context
+  // This ensures "Online" status is emitted even on Dashboard
+  useContext(SocketContext);
 
   const [mentors, setMentors] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -129,7 +134,8 @@ export default function StudentDashboard() {
   const upcomingRequests = requests.filter((r) => ["upcoming", "ongoing"].includes(r.status));
   const rejectedRequests = requests.filter((r) => r.status === "rejected");
 
-  const activeCount = upcomingRequests.length;
+  // Active requests include pending, upcoming and ongoing
+  const activeCount = requests.filter((r) => ["pending", "upcoming", "ongoing"].includes(r.status)).length;
 
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors duration-300 overflow-x-hidden">
@@ -203,11 +209,15 @@ export default function StudentDashboard() {
       </div>
 
       {selectedMentor && (
-        <MentorModal 
-          mentor={selectedMentor} 
-          onClose={() => setSelectedMentor(null)} 
-          onRequestSent={handleRequestSent} 
-          disabled={activeCount >= 2} 
+        <MentorModal
+          mentor={selectedMentor}
+          onClose={() => setSelectedMentor(null)}
+          onRequestSent={handleRequestSent}
+          disabledGlobal={activeCount >= 2}
+          disabledMentor={requests.some((r) => {
+            const mid = r.mentorId?._id || r.mentorId;
+            return String(mid) === String(selectedMentor._id) && ["pending", "upcoming", "ongoing"].includes(r.status);
+          })}
         />
       )}
 

@@ -4,8 +4,16 @@ import User from "../models/User.js";
 
 export const ensureAdminExists = async () => {
   try {
-    const email = process.env.ADMIN_EMAIL || "admin@mentorlink.io";
-    const password = process.env.ADMIN_PASSWORD || "Admin123!";
+    const email = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
+
+    if (!email || !password) {
+      console.error(
+        "❌ ADMIN_EMAIL or ADMIN_PASSWORD is not set in the environment. Skipping admin seeding."
+      );
+      return;
+    }
+
     const fullName = "System Admin";
     // Always ensure admin exists and has the configured password.
     // Use the email as the upsert filter to avoid duplicate key errors when an admin

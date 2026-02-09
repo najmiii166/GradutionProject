@@ -17,6 +17,12 @@ const MentorProfileSchema = new mongoose.Schema(
         to: { type: String },
       },
     ],
+    socialLinks: {
+      linkedin: { type: String, trim: true, default: "" },
+      x: { type: String, trim: true, default: "" },
+      facebook: { type: String, trim: true, default: "" },
+      website: { type: String, trim: true, default: "" },
+    },
     ratings: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

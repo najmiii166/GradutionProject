@@ -22,13 +22,15 @@ export default function SidebarButton({ icon, label, active, onClick, disabled, 
           layoutId="sidebar-active-pill"
           className="absolute inset-0 bg-cyan-500/10 dark:bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20"
           initial={false}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ type: "spring", stiffness: 200, damping: 24 }}
         />
       )}
 
       {active && (
         <motion.div 
           layoutId="sidebar-active-indicator"
+          initial={false}
+          transition={{ type: 'spring', stiffness: 220, damping: 22 }}
           className="absolute left-0 w-1 h-5 bg-gradient-to-b from-cyan-400 to-violet-500 rounded-r-full" 
         />
       )}
@@ -41,8 +43,8 @@ export default function SidebarButton({ icon, label, active, onClick, disabled, 
       </div>
 
       {!collapsed && (
-        <motion.span 
-          initial={{ opacity: 0, x: -10 }}
+        <motion.span
+          initial={false}
           animate={{ opacity: 1, x: 0 }}
           className="relative z-10 text-sm tracking-tight whitespace-nowrap"
         >

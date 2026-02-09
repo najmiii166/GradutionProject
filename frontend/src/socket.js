@@ -19,13 +19,16 @@ function getSocketOptions({ proxied, token }) {
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 500,
+    forceNew: true,
+    closeOnBeforeunload: true,
   };
   if (token) base.auth = { token };
   return base;
 }
 
-export function createSocket() {
-  const token = localStorage.getItem("token");
+export function createSocket(token) {
+  // Use passed token if available, otherwise fetch from storage
+  const finalToken = token || localStorage.getItem("token");
 
   // Decide whether API host differs from frontend host (i.e. proxied via Vercel)
   let proxied = false;
@@ -40,7 +43,7 @@ export function createSocket() {
   // which Vercel will rewrite to Railway per vercel.json. If not proxied, connect directly to API host.
   const connectUrl = proxied ? undefined : API_URL.replace(/\/api\/?$/i, "");
 
-  const opts = getSocketOptions({ proxied, token });
+  const opts = getSocketOptions({ proxied, token: finalToken });
   let socket = io(connectUrl, opts);
 
   socket.on("connect", () => console.log("🔌 Socket Connected:", socket.id));
