@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
-  School,
   Clock,
   GraduationCap,
   BookOpen,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 import Spinner from "../Spinner";
 import { faculties } from "../../constants/systemData";
-import { api } from "../../api/axios";
 
 const formatTime = (time) => {
   if (!time) return "";
@@ -34,11 +32,13 @@ export default function MentorRequests({
   loading,
   requests,
   onAction,
-  onViewStudent,
   externalOpenRequest,
+  onSeeMore,
+  maxVisible,
+  gridVariant = "single",
+  isSyncing = false,
 }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [summaries, setSummaries] = useState({}); // { [id]: { loading, data, error } }
 
   useEffect(() => {
     if (externalOpenRequest) {
@@ -46,12 +46,18 @@ export default function MentorRequests({
     }
   }, [externalOpenRequest]);
 
+  const displayRequests = maxVisible ? requests?.slice(0, maxVisible) : requests;
+  const hasOverflow = maxVisible && (requests?.length || 0) > maxVisible;
+  const gridClass = gridVariant === "multi"
+    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
+    : "grid grid-cols-1 gap-3";
+
   return (
     <>
-      <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-xl p-6 shadow-xl transition-colors duration-300">
+      <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-xl transition-colors duration-300 h-full flex flex-col">
         
-        {/* Header with Admin-Style Intelligence Branding */}
-        <div className="flex justify-between items-center mb-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-500">
               <Activity size={16} />
@@ -69,11 +75,14 @@ export default function MentorRequests({
                   {requests?.length || 0} Pending
                 </p>
              </div>
+             {isSyncing && (
+               <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Syncing…</span>
+             )}
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
           {loading ? (
             <div className="h-40 flex flex-col items-center justify-center gap-3">
               <Spinner className="border-cyan-500" />
@@ -90,8 +99,8 @@ export default function MentorRequests({
               </p>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {requests.map((r, idx) => {
+            <div className={gridClass}>
+              {displayRequests.map((r, idx) => {
                 const student = r.studentId || {};
                 const slot = r.slot || {};
 
@@ -101,67 +110,95 @@ export default function MentorRequests({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className="group relative rounded-xl border border-border/40 bg-foreground/[0.02] p-4 hover:border-cyan-500/40 hover:bg-foreground/[0.04] transition-all duration-300"
+                    className="group relative rounded-2xl border border-border/40 bg-foreground/[0.02] p-4 hover:border-cyan-500/40 hover:bg-foreground/[0.04] transition-all duration-300 overflow-hidden"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="flex gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
-                          <User size={18} />
+                    {/* Type Badge: Follow-up vs New */}
+                    <div className="absolute top-0 right-0">
+                      {r.isFollowUp ? (
+                        <div className="bg-cyan-500 text-white text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg shadow-cyan-500/20">
+                          Follow-up
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-foreground/90 leading-tight">
-                            {student.fullName || "Student"}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-[10px] uppercase tracking-wider text-foreground/40 font-medium">
-                              {student.university || "—"}
-                            </p>
-                            <span className="w-1 h-1 rounded-full bg-border" />
-                            <div className="flex items-center gap-1 text-[9px] font-bold text-cyan-500/60 uppercase">
-                              <Calendar size={10} />
-                              {r.requestedAt ? new Date(r.requestedAt).toLocaleDateString() : "—"}
-                            </div>
+                      ) : (
+                        <div className="bg-foreground/80 text-background text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-lg shadow-foreground/30">
+                          New Request
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20 shadow-inner shrink-0">
+                        <User size={22} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-foreground/90 leading-tight">
+                          {student.fullName || "Student"}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-[10px] uppercase tracking-wider text-foreground/40 font-bold">
+                            {student.university || "—"}
+                          </p>
+                          <span className="w-1 h-1 rounded-full bg-cyan-500/30" />
+                          <div className="flex items-center gap-1 text-[9px] font-black text-cyan-500/60 uppercase tracking-tighter">
+                            <Calendar size={10} />
+                            {r.requestedAt ? new Date(r.requestedAt).toLocaleDateString() : "—"}
                           </div>
                         </div>
                       </div>
-                      
-                      <button 
-                        onClick={() => setSelectedRequest(r)}
-                        className="group/btn flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-cyan-500 hover:text-cyan-400 transition-all"
-                      >
-                        Details
-                        <ChevronRight size={12} className="group-hover/btn:translate-x-0.5 transition-transform" />
-                      </button>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-4 items-center border-t border-border/30 pt-3">
-                      <div className="flex items-center gap-1.5 text-[11px] text-foreground/60">
+                    {/* Faculty/Semester Info */}
+                    <div className="mt-4 flex flex-wrap gap-3 items-center opacity-80 text-[11px] text-foreground/60">
+                      <div className="flex items-center gap-1.5 font-medium">
                         <BookOpen size={13} className="text-cyan-500/50" />
                         {getFacultyName(student.faculty)}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] text-foreground/60">
+                      <div className="flex items-center gap-1.5 font-medium">
                         <GraduationCap size={13} className="text-cyan-500/50" />
-                        Sem {student.semester || "—"}
+                        Semester {student.semester || "—"}
                       </div>
                     </div>
 
+                    {/* Time Slot: Full Width */}
                     {slot.day && (
-                      <div className="mt-3 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70">
+                      <div className="mt-3 px-3 py-2 rounded-xl bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[11px] font-black text-foreground/70 uppercase tracking-tight">
                           <Clock size={12} className="text-cyan-500" />
                           {slot.day}
                         </div>
-                        <span className="text-[10px] text-foreground/40 font-medium tracking-tight">
+                        <span className="text-[10px] text-foreground/40 font-black tracking-widest uppercase">
                           {formatTime(slot.from)} – {formatTime(slot.to)}
                         </span>
                       </div>
                     )}
+
+                    {/* Details Button: compact link style */}
+                    <div className="mt-3 pt-3 border-t border-border/20 flex justify-end">
+                      <button 
+                        onClick={() => setSelectedRequest(r)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-600 hover:text-cyan-500"
+                      >
+                        Details
+                        <ChevronRight size={14} className="transition-transform group-hover/btn:translate-x-1" />
+                      </button>
+                    </div>
                   </motion.div>
                 );
               })}
             </div>
           )}
         </div>
+
+        {hasOverflow && onSeeMore && (
+          <div className="pt-3 mt-3 border-t border-border/20 flex justify-end">
+            <button
+              onClick={onSeeMore}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-600 hover:text-cyan-500"
+            >
+              See more
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ================= MODAL ================= */}
@@ -174,10 +211,10 @@ export default function MentorRequests({
             className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-xl bg-card border border-border/50 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="w-full max-w-xl bg-card border border-border/50 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden"
             >
               <button
                 onClick={() => setSelectedRequest(null)}
@@ -186,14 +223,17 @@ export default function MentorRequests({
                 <X size={20} />
               </button>
 
-              <div className="mb-6">
-                <p className="text-[10px] uppercase tracking-[0.3em] font-black text-cyan-500 mb-1">Mentorship Questionnaire</p>
-               
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-[10px] uppercase tracking-[0.3em] font-black text-cyan-500">Mentorship Questionnaire</p>
+                  {selectedRequest.isFollowUp && (
+                     <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[8px] font-black uppercase text-cyan-600">Follow-up Session</span>
+                  )}
+                </div>
+                <h3 className="text-xl font-bold text-foreground/90">Reviewing {selectedRequest.studentId?.fullName}'s Intent</h3>
               </div>
 
               <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                
-                {/* EXPERIENCE LEVEL - Added back with "Skill Vector" styling */}
                 <div className="flex items-center justify-between bg-cyan-500/5 border border-cyan-500/10 rounded-2xl p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-cyan-500 text-white shadow-lg shadow-cyan-500/20">
@@ -290,7 +330,7 @@ export default function MentorRequests({
                     onAction(selectedRequest._id, "reject");
                     setSelectedRequest(null);
                   }}
-                  className="flex-1 py-3 rounded-xl bg-foreground/[0.03] text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
+                  className="flex-1 py-4 rounded-2xl bg-foreground/[0.03] text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
                 >
                   Decline Request
                 </button>
@@ -300,7 +340,7 @@ export default function MentorRequests({
                     onAction(selectedRequest._id, "accept");
                     setSelectedRequest(null);
                   }}
-                  className="flex-1 py-3 rounded-xl bg-cyan-500 text-white text-[10px] font-semibold uppercase tracking-widest shadow-lg shadow-cyan-500/20 hover:bg-cyan-600 transition-all"
+                  className="flex-1 py-4 rounded-2xl bg-cyan-500 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-cyan-500/20 hover:bg-cyan-600 transition-all active:scale-[0.98]"
                 >
                   Accept Request
                 </button>
@@ -309,7 +349,6 @@ export default function MentorRequests({
           </motion.div>
         )}
       </AnimatePresence>
-      {/* No global toast needed */}
     </>
   );
 }

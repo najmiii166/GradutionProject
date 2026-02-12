@@ -43,9 +43,33 @@ export default function OverviewPage({ stats, analytics }) {
     >
       {/* 1. Compact Stats Grid (Now the top of the page) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard index={0} title="Total Students" value={stats.totalStudents} icon={<Users size={20} />} />
-        <StatCard index={1} title="Total Mentors" value={stats.totalMentors} icon={<GraduationCap size={20} />} />
-        <StatCard index={2} title="Pending Accounts" value={stats.totalPending} icon={<Clock size={20} />} />
+        <StatCard 
+          index={0} 
+          title="Total Students" 
+          value={stats.totalStudents} 
+          icon={<Users size={20} className="stroke-[2.5px]" />}
+          bg="bg-kpi-1"
+          textColor="text-cyan-800 dark:text-cyan-400"
+          glow="bg-cyan-500/20"
+        />
+        <StatCard 
+          index={1} 
+          title="Total Mentors" 
+          value={stats.totalMentors} 
+          icon={<GraduationCap size={20} className="stroke-[2.5px]" />}
+          bg="bg-kpi-2"
+          textColor="text-violet-800 dark:text-violet-400"
+          glow="bg-violet-500/20"
+        />
+        <StatCard 
+          index={2} 
+          title="Pending Accounts" 
+          value={stats.totalPending} 
+          icon={<Clock size={20} className="stroke-[2.5px]" />}
+          bg="bg-kpi-3"
+          textColor="text-amber-800 dark:text-amber-400"
+          glow="bg-amber-500/20"
+        />
       </div>
 
       {/* 2. Refined Charts Area */}

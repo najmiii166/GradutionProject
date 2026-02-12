@@ -13,8 +13,8 @@ export const accountRejectedEmail = ({ name, role }) => {
     <p style="margin:0 0 16px 0;">
       This may be due to missing or inconsistent details. You’re welcome to review your information and apply again in the future.
     </p>
-    <p style="margin:0;">
-      If you believe this decision was made in error, you can reply to this email with any additional context.
+    <p style="margin:0 0 16px 0;">
+      If you believe this decision was made in error, please contact our support team through the Help Center in your MentorLink dashboard.
     </p>
   `;
 

@@ -1,7 +1,7 @@
 // src/components/student/StudentSidebar.jsx
 import { useState, useEffect } from "react";
 import { 
-  LayoutGrid, MessageCircle, LifeBuoy, Clock, 
+  LayoutGrid, MessageCircle, LifeBuoy, Clock, Users,
   LogOut, Sun, Moon 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,7 +33,8 @@ export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
   }, [isDark]);
 
   const navItems = [
-    { id: "home", label: "Dashboard", icon: LayoutGrid, path: null },
+    { id: "home", label: "Dashboard", icon: LayoutGrid, path: "/student/dashboard" },
+    { id: "mentors", label: "All Mentors", icon: Users, path: "/mentors" },
     { id: "chat", label: "Messages", icon: MessageCircle, path: "/chat" },
     { id: "support", label: "Support", icon: LifeBuoy, path: "/support" },
     { id: "history", label: "History", icon: Clock, path: "/history" },
@@ -48,7 +49,7 @@ export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-20 bg-background/80 backdrop-blur-xl border-r border-border/50 flex flex-col items-center py-8 z-50">
+    <aside className="fixed left-0 top-0 h-full w-20 bg-sidebar backdrop-blur-xl border-r border-border/50 flex flex-col items-center py-8 z-50 transition-colors duration-300">
       
       {/* 1. BRAND (Icon Only) */}
       <div className="mb-12">
@@ -69,7 +70,7 @@ export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
               className={`p-3 rounded-2xl transition-all duration-300 relative ${
                 activeTab === item.id 
                   ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20" 
-                  : "text-foreground/40 hover:bg-foreground/5 hover:text-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
               }`}
             >
               <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />

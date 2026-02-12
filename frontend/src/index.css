@@ -10,6 +10,16 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-border: var(--border);
+
+  /* New KPI Colors */
+  --color-kpi-1: var(--kpi-1);
+  --color-kpi-2: var(--kpi-2);
+  --color-kpi-3: var(--kpi-3);
+  --color-kpi-4: var(--kpi-4);
+
+  /* New Sidebar Colors */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
 }
 
 @layer base {
@@ -19,6 +29,17 @@
     --foreground: #020617;
     --border: #e2e8f0;
     --card: #ffffff;
+    
+    /* Custom Sidebar - Light (Dark Brand Color for High Contrast) */
+    --sidebar: #0f172a; /* Slate-900 */
+    --sidebar-foreground: #f0f9ff; /* Sky-50 */
+
+    /* Custom KPI Cards - Light (More Saturated/Visible Pastels) */
+    --kpi-1: #bae6fd; /* Sky-200 */
+    --kpi-2: #ddd6fe; /* Violet-200 */
+    --kpi-3: #fde68a; /* Amber-200 */
+    --kpi-4: #fecdd3; /* Rose-200 */
+
     color-scheme: light;
   }
 
@@ -28,6 +49,17 @@
     --foreground: #f8fafc;
     --border: rgba(255, 255, 255, 0.1);
     --card: rgba(255, 255, 255, 0.02);
+
+    /* Custom Sidebar - Dark (Even Darker) */
+    --sidebar: #020617; /* Same as background for a true "dark" sidebar */
+    --sidebar-foreground: #e0f2fe;
+
+    /* Custom KPI Cards - Dark (Higher Opacity for Visibility) */
+    --kpi-1: rgba(14, 165, 233, 0.2);
+    --kpi-2: rgba(139, 92, 246, 0.2);
+    --kpi-3: rgba(245, 158, 11, 0.2);
+    --kpi-4: rgba(244, 63, 94, 0.2);
+
     color-scheme: dark;
   }
 

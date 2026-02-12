@@ -3,7 +3,7 @@ import Button from "../Button";
 import InfoItem from "./InfoItem";
 import buildIdCardSrc from "../../utils/buildIdCardSrc";
 import { 
-  X, ShieldAlert, CheckCircle, User, BookOpen, 
+  X, CheckCircle, User, BookOpen, 
   GraduationCap, Linkedin, Twitter, Facebook, Globe, Target 
 } from "lucide-react";
 import { faculties } from "../../constants/systemData";
@@ -196,13 +196,14 @@ export default function DetailsModal({
 
         {/* Footer */}
         <div className="px-8 py-6 border-t border-border/50 bg-foreground/[0.01] flex justify-end gap-3">
-          <button
+          <Button
+            variant="ghost"
+            className="flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-2xl transition-all active:scale-95"
             onClick={() => handleReject(modalUser._id)}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl border border-red-500/20 text-red-500 text-xs font-bold hover:bg-red-500 hover:text-white transition-all duration-300"
           >
-            <ShieldAlert size={14} />
-            Reject Account
-          </button>
+            <X size={14} />
+            Reject
+          </Button>
           <Button
             variant="Brand"
             className="flex items-center gap-2 px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-2xl shadow-xl shadow-cyan-500/10 transition-all active:scale-95"

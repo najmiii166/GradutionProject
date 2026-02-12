@@ -1,5 +1,5 @@
 // src/pages/MentorDashboard.jsx
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { setAuthToken } from "../api/axios";
 import { SocketContext } from "../Contexts/SocketContext";
@@ -73,8 +73,8 @@ export default function MentorDashboard() {
   const { studentModalOpen, openStudentProfile, closeStudentProfile, studentProfile, loadingStudentProfile } = useStudentProfile(setToast);
   const { profile, loadingProfile, editingAvailability, setEditingAvailability, saveAvailability, savingAvailability } = useMentorProfile(setToast);
   const { stats } = useMentorStats(setToast);
-  const { requests, loadingRequests, handleRequestAction } = useMentorRequests(setToast);
-  const { upcomingSessions, loadingSessions, fetchUpcomingSessions } = useMentorSessions(setToast);
+  const { requests, loadingRequests, syncingRequests, fetchRequests, handleRequestAction } = useMentorRequests(setToast);
+  const { upcomingSessions, loadingSessions, syncingSessions, fetchUpcomingSessions } = useMentorSessions(setToast);
   const {
     showNotifications,
     setShowNotifications,
@@ -106,6 +106,14 @@ export default function MentorDashboard() {
   const availabilityCount = profile?.availability?.length || 0;
   const expertiseCount = profile?.expertiseAreas?.length || 0;
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchRequests(true);
+      fetchUpcomingSessions(true);
+    }, 30000);
+    return () => clearInterval(id);
+  }, [fetchRequests, fetchUpcomingSessions]);
+
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors duration-300">
       
@@ -120,6 +128,10 @@ export default function MentorDashboard() {
         setActiveTab={setActiveTab} 
         navigate={navigate} 
         setSettingsOpen={setSettingsOpen} 
+        requestsCount={requests.length}
+        upcomingCount={upcomingSessions.length}
+        onGoRequests={() => navigate("/mentor/requests")}
+        onGoUpcoming={() => navigate("/mentor/upcoming")}
       />
 
       <MentorNavbar
@@ -134,10 +146,12 @@ export default function MentorDashboard() {
         setNotifications={setNotifications}
         setMentorModalOpen={setMentorModalOpen}
         fullName={fullName}
+        activeTab={activeTab}
+        status={status}
       />
 
       {/* --- MAIN DASHBOARD SURFACE --- */}
-      <main className="pl-20 pr-8 py-8 max-w-[1600px] mx-auto space-y-8">
+      <main className="pl-24 pr-10 py-10 max-w-[1640px] mx-auto space-y-10">
         
         {/* TOP LEVEL METRICS (KPIs) */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -145,25 +159,33 @@ export default function MentorDashboard() {
             icon={Users}
             label="Expertise Areas"
             value={expertiseCount}
-            color="from-primary/20 to-primary/10"
+            bg="bg-kpi-1"
+            textColor="text-cyan-800 dark:text-cyan-400"
+            glow="bg-cyan-500/20"
           />
           <MentorKPICard
             icon={Calendar}
             label="Available Days"
             value={availabilityCount}
-            color="from-primary/20 to-primary/10"
+            bg="bg-kpi-2"
+            textColor="text-violet-800 dark:text-violet-400"
+            glow="bg-violet-500/20"
           />
           <MentorKPICard
             icon={Star}
             label="Avg Rating"
             value={stats?.averageRating ? Number(stats.averageRating).toFixed(1) : "0.0"}
-            color="from-primary/20 to-primary/10"
+            bg="bg-kpi-3"
+            textColor="text-amber-800 dark:text-amber-400"
+            glow="bg-amber-500/20"
           />
           <MentorKPICard
             icon={Clock}
             label="Total Credits"
             value={stats?.credits || 0}
-            color="from-primary/20 to-primary/10"
+            bg="bg-kpi-4"
+            textColor="text-rose-800 dark:text-rose-400"
+            glow="bg-rose-500/20"
           />
         </div>
 
@@ -177,6 +199,9 @@ export default function MentorDashboard() {
               onAction={onRequestAction}
               onViewStudent={openStudentProfile}
               externalOpenRequest={externalOpenRequest}
+              maxVisible={1}
+              onSeeMore={() => navigate("/mentor/requests")}
+              isSyncing={syncingRequests}
             />
           </div>
 
@@ -187,6 +212,10 @@ export default function MentorDashboard() {
               sessions={upcomingSessions}
               onRefresh={fetchUpcomingSessions}
               onViewStudent={openStudentProfile}
+              maxVisible={1}
+              onSeeMore={() => navigate("/mentor/upcoming")}
+              isSyncing={syncingSessions}
+              showBadge
             />
           </div>
 

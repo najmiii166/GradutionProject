@@ -34,7 +34,7 @@ router.post("/", auth, async (req, res) => {
     }
 
     const studentId = req.user.id;
-    const { mentorId, slot, questionnaire } = req.body;
+    const { mentorId, slot, questionnaire, parentSessionId, isFollowUp } = req.body;
 
 
     if (!mentorId || !slot) {
@@ -47,6 +47,22 @@ router.post("/", auth, async (req, res) => {
     const to = slot?.to;
     if (!day || !from || !to) {
       return res.status(400).json({ success: false, message: "Slot requires day, from and to." });
+    }
+
+    // Block double-booking for accepted (upcoming/ongoing) slots
+    const occupied = await Request.findOne({
+      mentorId,
+      status: { $in: ["upcoming", "ongoing"] },
+      "slot.day": day,
+      "slot.from": from,
+      "slot.to": to,
+    }).lean();
+
+    if (occupied) {
+      return res.status(409).json({
+        success: false,
+        message: "This time slot is already booked. Please pick another slot.",
+      });
     }
 
     // Prevent having more than 2 active requests across all mentors
@@ -62,7 +78,7 @@ router.post("/", auth, async (req, res) => {
     }
 
     // Also prevent duplicate active request for the same mentor
-    const exists = await Request.findOne({
+    const activeExisting = await Request.findOne({
       studentId,
       mentorId,
       status: { $in: ["pending", "upcoming", "ongoing"] },
@@ -76,6 +92,17 @@ router.post("/", auth, async (req, res) => {
       });
     }
 
+    let parent = null;
+    if (parentSessionId) {
+      parent = await Request.findById(parentSessionId).lean();
+      if (!parent || String(parent.studentId) !== String(studentId)) {
+        return res.status(400).json({ success: false, message: "Invalid parent session for follow-up." });
+      }
+      if (String(parent.mentorId) !== String(mentorId)) {
+        return res.status(400).json({ success: false, message: "Follow-up must target the same mentor as the original session." });
+      }
+    }
+
     const newReq = await Request.create({
       studentId,
       mentorId,
@@ -83,6 +110,8 @@ router.post("/", auth, async (req, res) => {
       questionnaire,
       status: "pending",
       requestedAt: new Date(),
+      parentSessionId: parent ? parent._id : undefined,
+      isFollowUp: !!parent || !!isFollowUp,
     });
 
     // Emit notification to mentor (notify by mentor's linked User id)
@@ -100,6 +129,7 @@ router.post("/", auth, async (req, res) => {
           requestedAt: newReq.requestedAt,
           slot: newReq.slot,
           status: newReq.status,
+          isFollowUp: newReq.isFollowUp,
         };
 
         if (mentorUserId) {
@@ -117,6 +147,33 @@ router.post("/", auth, async (req, res) => {
   } catch (err) {
     console.error("REQUEST CREATE ERROR:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+/* ============================
+   GET OCCUPIED SLOTS FOR A MENTOR (UPCOMING/ONGOING)
+   Used by students to disable booked slots in UI
+============================ */
+router.get("/mentor/:id/occupied-slots", auth, async (req, res) => {
+  try {
+    if (!req.params.id) return res.status(400).json({ message: "Missing mentor id" });
+
+    const occupied = await Request.find({
+      mentorId: req.params.id,
+      status: { $in: ["upcoming", "ongoing"] },
+    })
+      .select("slot")
+      .lean();
+
+    const slots = occupied
+      .map((r) => r.slot)
+      .filter((s) => s && s.day && s.from && s.to)
+      .map((s) => ({ day: s.day, from: s.from, to: s.to }));
+
+    res.json(slots);
+  } catch (err) {
+    console.error("GET occupied slots error", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -242,6 +299,9 @@ router.patch("/mentor/:id", auth, async (req, res) => {
     sunday: 0, monday: 1, tuesday: 2,
     wednesday: 3, thursday: 4,
     friday: 5, saturday: 6,
+    sun: 0, mon: 1, tue: 2,
+    wed: 3, thu: 4,
+    fri: 5, sat: 6,
   };
 
   const now = new Date();

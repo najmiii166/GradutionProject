@@ -81,6 +81,7 @@ export default function StudentRegister() {
     e.preventDefault();
     if (!selectedUniKey) return setToast('Please select a university');
     if (!selectedFacultyKey) return setToast('Please select a faculty');
+    if (!selectedLearningGoals.length) return setToast('Please select one learning goal');
     if (!idFile) return setToast('Please upload your Student ID');
 
     const data = new FormData();
@@ -129,7 +130,7 @@ export default function StudentRegister() {
                   {step === 1 ? "Create " : "Final "} 
                   <span className="italic font-serif text-cyan-400">{step === 1 ? "Account." : "Details."}</span>
                 </h1>
-                <p className="text-sm font-light text-foreground/60 mt-2">Step {step} of 2 — {step === 1 ? "Basics" : "Academics"}</p>
+                <p className="text-sm font-light text-foreground/60 mt-2">Step {step} of 2 — {step === 1 ? "Credentials" : "Academics"}</p>
               </div>
               {step === 2 && (
                 <button type="button" onClick={() => setStep(1)} className="text-xs text-foreground/40 hover:text-cyan-400 flex items-center gap-1 transition-colors">
@@ -226,11 +227,17 @@ export default function StudentRegister() {
 
                     {selectedFacultyKey && (
                       <div className="space-y-3 p-4 rounded-2xl bg-foreground/[0.02] border border-border/50">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-1">Learning Goals</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-1">Learning Goal</p>
                         <div className="grid grid-cols-2 gap-2">
                           {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
                             <label key={sub.key} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedLearningGoals.includes(sub.key) ? 'border-cyan-500/50 bg-cyan-500/[0.03]' : 'border-border bg-background hover:border-cyan-500/30'}`}>
-                              <input type="checkbox" className="hidden" checked={selectedLearningGoals.includes(sub.key)} onChange={(e) => e.target.checked ? setSelectedLearningGoals(s => [...s, sub.key]) : setSelectedLearningGoals(s => s.filter(x => x !== sub.key))} />
+                              <input
+                                type="radio"
+                                name="learningGoal"
+                                className="hidden"
+                                checked={selectedLearningGoals[0] === sub.key}
+                                onChange={() => setSelectedLearningGoals([sub.key])}
+                              />
                               <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedLearningGoals.includes(sub.key) ? 'bg-cyan-500 border-cyan-500' : 'border-border'}`}>
                                 {selectedLearningGoals.includes(sub.key) && <CheckCircle2 className="w-3 h-3 text-white" />}
                               </div>
