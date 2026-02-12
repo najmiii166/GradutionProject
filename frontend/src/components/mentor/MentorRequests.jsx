@@ -38,6 +38,8 @@ export default function MentorRequests({
   externalOpenRequest,
 }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [summaries, setSummaries] = useState({}); // { [requestId]: { loading, error, data } }
+  const [summaryLang, setSummaryLang] = useState("en");
   // AI Analyze removed: no toast needed here
 
   useEffect(() => {
@@ -227,6 +229,66 @@ export default function MentorRequests({
                 <Section title="Session Focus">
                   {selectedRequest.questionnaire?.sessionGoal || "General Guidance."}
                 </Section>
+
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-foreground/30 px-1">AI Summary</p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={summaryLang}
+                      onChange={(e) => setSummaryLang(e.target.value)}
+                      className="text-[10px] px-2 py-1 rounded-lg bg-foreground/3 border border-border/50 text-foreground/70"
+                    >
+                      <option value="en">English</option>
+                      <option value="so">Somali</option>
+                    </select>
+                    <button
+                    className="px-3 py-1.5 rounded-xl bg-foreground text-background text-[10px] font-bold uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all"
+                    onClick={async () => {
+                      const id = selectedRequest._id;
+                      setSummaries((prev) => ({ ...prev, [id]: { ...(prev[id]||{}), loading: true, error: "" } }));
+                      try {
+                        if (!summaries[id]?.data) {
+                          const { data } = await api.get(`/mentor/requests/${id}/ai-summary`, { params: { lang: summaryLang } });
+                          setSummaries((prev) => ({ ...prev, [id]: { loading: false, error: "", data } }));
+                        } else {
+                          setSummaries((prev) => ({ ...prev, [id]: { ...prev[id], loading: false } }));
+                        }
+                      } catch (err) {
+                        const status = err?.response?.status;
+                        const msg = err?.response?.data?.message || "Failed to load summary.";
+                        const errorText = status === 429 ? "You're asking too fast, please wait." : msg;
+                        setSummaries((prev) => ({ ...prev, [id]: { loading: false, error: errorText, data: prev[id]?.data } }));
+                      }
+                    }}
+                  >
+                    {summaries[selectedRequest._id]?.loading ? "Loading..." : (summaries[selectedRequest._id]?.data ? "Refresh" : "AI Summary")}
+                  </button>
+                  </div>
+                </div>
+
+                {summaries[selectedRequest._id]?.error && (
+                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest px-1">{summaries[selectedRequest._id].error}</p>
+                )}
+
+                {summaries[selectedRequest._id]?.data && (
+                  <div className="space-y-2">
+                    <div className="text-[13px] text-foreground/70 bg-foreground/[0.02] border border-border/40 rounded-2xl p-4 leading-relaxed">
+                      {summaries[selectedRequest._id].data.summary}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {(summaries[selectedRequest._id].data.keyPoints || []).map((kp, i) => (
+                        <div key={i} className="px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-[11px] text-foreground/70">
+                          • {kp}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-foreground/40 px-1">
+                      <span className="font-black">Difficulty:</span>
+                      <span className="font-bold text-foreground/60">{summaries[selectedRequest._id].data.difficulty}</span>
+                    </div>
+                    {/* Suggested Agenda removed per request */}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 mt-10">

@@ -33,6 +33,7 @@ import sessionsRoutes from "./routes/sessions.routes.js";
 import recommendationsRoutes from "./routes/recommendations.routes.js";
 // AI routes removed
 import feedbackRoutes from "./routes/feedback.routes.js";
+import contactRoutes from "./routes/contact.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,7 +86,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"]
-}));
+};
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // ✅ IMPORTANT: preflight uses SAME options
@@ -112,6 +113,7 @@ app.use("/api/enrollments", enrollmentsRoutes);
 app.use("/api/sessions", sessionsRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api", contactRoutes);
 
 // Debug route: returns the request Origin and whether it's allowed by CORS.
 // Useful for remote debugging when browser shows CORS errors.

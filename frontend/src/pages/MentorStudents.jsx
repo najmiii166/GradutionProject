@@ -28,7 +28,7 @@ export default function MentorStudents() {
   })();}, []);
 
   return (
-    <div className="p-6 min-h-screen bg-slate-950 text-white">
+    <div className="p-6 min-h-screen bg-background text-foreground">
       <h2 className="text-2xl font-semibold mb-4">My Students</h2>
       {loading ? <div>Loading...</div> : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

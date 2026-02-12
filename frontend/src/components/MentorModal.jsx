@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/axios";
-import { Briefcase, Sparkles, Calendar, Info, X, ChevronRight , CheckCircle2} from "lucide-react";
+import { Briefcase, Calendar, Info, X, ChevronRight , CheckCircle2} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import MentorQuestionnaire from "./MentorQuestionnaire";
 import { universities } from "../constants/systemData";

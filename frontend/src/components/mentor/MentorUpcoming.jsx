@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CalendarDays,
@@ -14,9 +14,7 @@ import {
 import Spinner from "../Spinner";
 import { api } from "../../api/axios";
 import { useNavigate } from "react-router-dom";
-// Import your existing hook
 import useCountdown from "../../hooks/useCountdown";
-import { useState, useMemo, useEffect } from "react";
 import { isJoinWindowOpen, getJoinWindowState } from "../../utils/joinWindow";
 
 const isValidMeetLink = (link) =>
@@ -25,33 +23,19 @@ const isValidMeetLink = (link) =>
 /* =========================
    SESSION ITEM
 ========================= */
-function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh }) {
-  // Use your global hook for the start time
+function SessionItem({ s, onOpenMeet, onChat, onViewStudent }) {
   const countdown = useCountdown(s.startTime);
-  
+
   const now = new Date();
   const startTime = new Date(s.startTime);
   const endTime = new Date(s.endTime);
-  
+
   const isOngoing = now >= startTime && now <= endTime;
-  const isPast = now > endTime;
-  const showJoin = isOngoing && s.meetingLink && ["upcoming", "ongoing"].includes(s.status);
-
-/* =========================
-   SESSION ITEM (SAFE)
-function SessionItem({
-  s,
-  onOpenMeet,
-  onChat,
-  onViewStudent,
-}) {
-  const { label } = useSessionCountdown(
-    s.startTime,
-    s.endTime
-  );
-
   // Strict join window: visible from 5 minutes before start until end
-  const windowOpen = typeof s.canJoin === "boolean" ? s.canJoin : isJoinWindowOpen(s.startTime, s.endTime, 5);
+  const windowOpen =
+    typeof s.canJoin === "boolean"
+      ? s.canJoin
+      : isJoinWindowOpen(s.startTime, s.endTime, 5);
   const joinState = getJoinWindowState(s.startTime, s.endTime, 5);
   const showJoin =
     windowOpen &&
@@ -63,7 +47,7 @@ function SessionItem({
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ scale: 1.01 }}
-      className="group relative rounded-xl border border-border/40 bg-foreground/[0.02] p-5 hover:border-cyan-500/40 hover:bg-foreground/[0.04] transition-all duration-300"
+      className="group relative rounded-xl border border-border/40 bg-foreground/2 p-5 hover:border-cyan-500/40 hover:bg-foreground/4 transition-all duration-300"
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex gap-3">
@@ -84,7 +68,11 @@ function SessionItem({
           <button
             onClick={() => {
               try {
-                const win = window.open(s.meetingLink, "_blank", "noopener,noreferrer");
+                const win = window.open(
+                  s.meetingLink,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
                 if (win && typeof win.focus === "function") win.focus();
               } catch {}
               // Fire-and-forget join tracking; never block navigation
@@ -97,34 +85,45 @@ function SessionItem({
             Join Session
             <ExternalLink className="w-3 h-3" />
           </button>
-        ) : (
-          // Before window: show disabled join hint; After end: hide join
-          s.meetingLink && joinState === "before" && ["upcoming", "ongoing"].includes(s.status) ? (
-            <span className="text-xs text-slate-400">Available 5 minutes before start</span>
-          ) : null
-        )}
+        ) : s.meetingLink &&
+          joinState === "before" &&
+          ["upcoming", "ongoing"].includes(s.status) ? (
+          <span className="text-xs text-slate-400">
+            Available 5 minutes before start
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mt-4">
         {/* UPDATED: Shows From -> To */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-foreground/[0.03] border border-border/20">
-          <CalendarDays size={12} className="text-cyan-500/60 flex-shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-foreground/3 border border-border/20">
+          <CalendarDays size={12} className="text-cyan-500/60 shrink-0" />
           <span className="text-[10px] font-bold text-foreground/70 uppercase">
-            {s.dayOfWeek} <span className="text-cyan-500/80">{s.from} - {s.to}</span>
+            {s.dayOfWeek}{" "}
+            <span className="text-cyan-500/80">
+              {s.from} - {s.to}
+            </span>
           </span>
         </div>
 
-        {/* UPDATED: Uses your custom countdown logic styling */}
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-            isOngoing ? "bg-emerald-500/5 border-emerald-500/20 shadow-inner" : 
-            isCritical ? "bg-rose-500/5 border-rose-500/20 animate-pulse" :
-            "bg-foreground/[0.03] border-border/20"
-        }`}>
-          <Clock size={12} className={isOngoing ? "text-emerald-500" : isCritical ? "text-rose-500" : "text-cyan-500/60"} />
-          <span className={`text-[10px] font-bold uppercase truncate tabular-nums ${
-            isOngoing ? "text-emerald-500" : isCritical ? "text-rose-500" : "text-foreground/70"
-          }`}>
-            {getTimerLabel()}
+        {/* Countdown to session start */}
+        <div
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+            isOngoing
+              ? "bg-emerald-500/5 border-emerald-500/20 shadow-inner"
+              : "bg-foreground/3 border-border/20"
+          }`}
+        >
+          <Clock
+            size={12}
+            className={isOngoing ? "text-emerald-500" : "text-cyan-500/60"}
+          />
+          <span
+            className={`text-[10px] font-bold uppercase truncate tabular-nums ${
+              isOngoing ? "text-emerald-500" : "text-foreground/70"
+            }`}
+          >
+            {countdown.text}
           </span>
         </div>
       </div>
@@ -149,7 +148,11 @@ function SessionItem({
           onClick={() => onViewStudent(s.studentId)}
           className="group/btn flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-foreground/30 hover:text-cyan-500 transition-all"
         >
-          Profile <ChevronRight size={12} className="group-hover/btn:translate-x-0.5 transition-transform" />
+          Profile{" "}
+          <ChevronRight
+            size={12}
+            className="group-hover/btn:translate-x-0.5 transition-transform"
+          />
         </button>
       </div>
     </motion.li>
@@ -197,7 +200,7 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
 
           <button
             onClick={onRefresh}
-            className="px-3 py-1 rounded-full bg-foreground/[0.03] border border-border/50 text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-cyan-500 hover:border-cyan-500/30 transition-all"
+            className="px-3 py-1 rounded-full bg-foreground/3 border border-border/50 text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-cyan-500 hover:border-cyan-500/30 transition-all"
           >
             Refresh
           </button>
@@ -243,13 +246,13 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-md flex items-center justify-center p-4"
+            className="fixed inset-0 z-60 bg-background/80 backdrop-blur-md flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-card border border-border/50 rounded-[2rem] p-8 shadow-2xl relative"
+              className="w-full max-w-md bg-card border border-border/50 rounded-4xl p-8 shadow-2xl relative"
             >
               <button
                 onClick={() => setShowMeetModal(false)}
@@ -274,7 +277,7 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
                     placeholder="https://meet.google.com/xxx-xxxx-xxx"
                     value={meetingLink}
                     onChange={(e) => setMeetingLink(e.target.value)}
-                    className="w-full px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-border/50 text-sm text-foreground focus:outline-none focus:border-cyan-500/50 transition-all"
+                    className="w-full px-5 py-4 rounded-2xl bg-foreground/3 border border-border/50 text-sm text-foreground focus:outline-none focus:border-cyan-500/50 transition-all"
                   />
                   {!isValid && meetingLink && (
                     <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight px-1 flex items-center gap-1">
@@ -286,7 +289,7 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => setShowMeetModal(false)}
-                    className="flex-1 py-3 rounded-xl bg-foreground/[0.03] text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:bg-foreground/10 transition-all"
+                    className="flex-1 py-3 rounded-xl bg-foreground/3 text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:bg-foreground/10 transition-all"
                   >
                     Cancel
                   </button>

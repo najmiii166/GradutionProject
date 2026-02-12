@@ -1,6 +1,7 @@
 // src/components/student/StudentNavbar.jsx
 import { useEffect, useRef, useState } from "react";
 import { Mail } from "lucide-react";
+import ThemeToggle from "../ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { getInitials } from "../../utils/student";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,6 +45,8 @@ export default function StudentNavbar({
       
       {/* Right side: Floating Actions Pill */}
       <div className="flex items-center gap-3 bg-card/30 backdrop-blur-xl border border-border/50 p-1.5 rounded-2xl shadow-xl">
+        <ThemeToggle className="hidden sm:inline-flex" />
+        <div className="w-[1px] h-6 bg-border/50" />
         
         <div className="relative flex items-center justify-center">
           <button

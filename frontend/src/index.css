@@ -1,48 +1,76 @@
 @import "tailwindcss";
+/* Inter font for high-contrast corporate typography */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 @theme {
   /* Core Brand Colors */
   --color-slate-950: #020617;
   --color-primary: #0ea5e9; /* cyan-500 */
+  --color-secondary: #8b5cf6; /* violet-500 */
+  --color-success: #10b981; /* emerald-500 */
   
   /* Modern UI Variables */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-border: var(--border);
+  --color-muted: var(--muted);
 }
 
 @layer base {
   /* Default Light Mode Styles */
   :root {
-    --background: #ffffff;
-    --foreground: #020617;
-    --border: #e2e8f0;
-    --card: #ffffff;
+    --background: #f8fafc; /* Slate-50 background */
+    --foreground: #0f172a; /* Slate-900 text */
+    --card: #ffffff;       /* Clean white cards */
+    --border: #e2e8f0;     /* Slate-200 borders */
+    --muted: #64748b;      /* Slate-500 for muted text */
+    --primary: var(--color-primary);
+    --secondary: var(--color-secondary);
+    --success: var(--color-success);
     color-scheme: light;
   }
 
   /* Dark Mode Override - Triggered by .dark class on <html> */
   :root.dark {
-    --background: #020617;
-    --foreground: #f8fafc;
-    --border: rgba(255, 255, 255, 0.1);
-    --card: rgba(255, 255, 255, 0.02);
+    --background: #020617; /* Slate-950 */
+    --foreground: #f8fafc; /* Slate-50 text */
+    --card: #0f172a;       /* Slate-900 cards */
+    --border: rgba(30, 41, 59, 0.5); /* Slate-800/50 subtle borders */
+    --muted: #94a3b8;      /* Slate-400 for muted text */
+    --primary: var(--color-primary);
+    --secondary: var(--color-secondary);
+    --success: var(--color-success);
     color-scheme: dark;
+  }
+
+  html {
+    @apply scroll-smooth;
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
-    /* Transition added to make theme switching feel smooth */
-    @apply antialiased selection:bg-cyan-500/30 transition-colors duration-200;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    /* Smooth theme switching */
+    @apply antialiased selection:bg-cyan-500/30 transition-colors duration-300;
   }
 }
 
 @layer components {
-  /* The "Glass" style used in your Login and Modal */
+  /* Glassmorphism for navigation/floating cards */
   .glass {
-    @apply backdrop-blur-xl border border-white/5 bg-white/[0.02] shadow-2xl;
+    @apply rounded-2xl backdrop-blur-xl border border-border/60 bg-background/70 dark:bg-white/[0.02] shadow-2xl;
+  }
+  
+  /* Neutral card shadow for light mode (Linear / Notion style) */
+  .card-elevated {
+    @apply bg-card border border-border shadow-[0_1px_3px_0_rgba(0,0,0,0.05)];
+  }
+  
+  /* Generic card utility following system spec */
+  .card {
+    @apply rounded-2xl bg-card border border-border;
   }
   
   /* Custom inputs for Login/Register */

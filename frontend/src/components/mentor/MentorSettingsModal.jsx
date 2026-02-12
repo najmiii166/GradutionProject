@@ -6,11 +6,11 @@ export default function MentorSettingsModal({ open, onClose, onLogout }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-      <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 w-full max-w-xs shadow-xl">
+      <div className="bg-card border border-border rounded-xl p-6 w-full max-w-xs shadow-xl">
         <h2 className="text-lg font-semibold mb-4">Settings</h2>
 
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-slate-300">Theme</span>
+          <span className="text-sm text-foreground/80">Theme</span>
           <div className="flex items-center gap-3">
             <Sun className="w-5 h-5 text-yellow-400" />
             <Moon className="w-5 h-5 text-slate-400" />
