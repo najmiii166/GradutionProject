@@ -269,7 +269,62 @@ export default function MentorRequests({
                 </Section>
               </div>
 
-              <div className="flex gap-3 mt-10">
+              {/* AI Summary */}
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm font-medium text-slate-300">AI Summary</p>
+                <button
+                  onClick={async () => {
+                    const id = selectedRequest._id;
+                    const state = summaries[id] || { loading: false };
+                    if (state.loading || state.data) return; // cached or loading
+                    setSummaries((prev) => ({ ...prev, [id]: { loading: true } }));
+                    try {
+                      const { data } = await api.get(`/mentor/requests/${id}/ai-summary`);
+                      const payload = data?.data || null;
+                      setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: payload, error: null } }));
+                    } catch (err) {
+                      const msg = err?.response?.data?.message || "Failed to load AI summary";
+                      setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: null, error: msg } }));
+                    }
+                  }}
+                  className="text-xs px-3 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
+                >
+                  {(summaries[selectedRequest._id]?.loading) ? "Loading…" : (summaries[selectedRequest._id]?.data ? "Loaded" : "AI Summary")}
+                </button>
+              </div>
+
+              {summaries[selectedRequest._id]?.error && (
+                <div className="mt-2 text-xs text-rose-400">{summaries[selectedRequest._id].error}</div>
+              )}
+
+              {summaries[selectedRequest._id]?.data && (
+                <div className="mt-2 rounded-lg bg-slate-900/60 border border-slate-800 p-3">
+                  <p className="text-sm text-slate-300">{summaries[selectedRequest._id].data.summary}</p>
+
+                  {Array.isArray(summaries[selectedRequest._id].data.keyPoints) && summaries[selectedRequest._id].data.keyPoints.length > 0 && (
+                    <ul className="mt-2 list-disc list-inside text-sm text-slate-300">
+                      {summaries[selectedRequest._id].data.keyPoints.map((kp, i) => (
+                        <li key={i}>{kp}</li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="mt-2 text-[12px] text-slate-400">Difficulty: <span className="text-slate-200">{summaries[selectedRequest._id].data.difficulty}</span></div>
+
+                  {Array.isArray(summaries[selectedRequest._id].data.suggestedAgenda) && summaries[selectedRequest._id].data.suggestedAgenda.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-slate-200">Suggested Agenda</p>
+                      <ul className="mt-1 list-disc list-inside text-sm text-slate-300">
+                        {summaries[selectedRequest._id].data.suggestedAgenda.map((item, idx) => (
+                          <li key={idx}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => {
                     onAction(selectedRequest._id, "reject");
