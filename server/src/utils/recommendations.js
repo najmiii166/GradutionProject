@@ -5,6 +5,17 @@
 import MentorProfile from "../models/MentorProfile.js";
 import StudentProfile from "../models/StudentProfile.js";
 
+// Map short day keys used in availability (Mon, Tue, ...) to full names
+const DAY_KEY_TO_LABEL = {
+  mon: "monday",
+  tue: "tuesday",
+  wed: "wednesday",
+  thu: "thursday",
+  fri: "friday",
+  sat: "saturday",
+  sun: "sunday",
+};
+
 /**
  * Normalize an input value to a flat array of lowercase, trimmed strings.
  * - Arrays of strings => trimmed lowercase
@@ -27,11 +38,15 @@ export function normalizeArray(v) {
       }
       // Handle time-slot-like objects: { day, from, to }
       if (typeof item === "object") {
-        const day = String(item.day || "").trim().toLowerCase();
+        const rawDay = String(item.day || "").trim();
+        const dayKey = rawDay.toLowerCase();
+        const mappedDay = DAY_KEY_TO_LABEL[dayKey] || rawDay;
+        const day = mappedDay.toLowerCase();
         const from = String(item.from || "").trim().toLowerCase();
         const to = String(item.to || "").trim().toLowerCase();
         // Prefer a few canonical tokens to maximize matching chances
-        if (day) out.push(day);
+        if (dayKey && DAY_KEY_TO_LABEL[dayKey]) out.push(dayKey); // e.g. "mon"
+        if (day) out.push(day); // e.g. "monday"
         if (day && from && to) out.push(`${day} ${from}-${to}`);
         continue;
       }
@@ -162,10 +177,14 @@ function formatSlot(slot) {
  * @param {Object} params
  * @param {string} params.studentId - The user id for the student (StudentProfile.user)
  * @param {number} [params.limit=3] - Max recommendations to return
+ * @param {Array<string>|string} [params.preferredDays] - Days of week the student prefers (e.g. ["monday","wednesday"]) 
  * @returns {Promise<Array<{ mentorId: string, score: number, reasons: string[] }>>}
  */
-export async function recommendMentors({ studentId, limit = 3 } = {}) {
+export async function recommendMentors({ studentId, limit = 3, preferredDays } = {}) {
   const safeLimit = Math.max(1, Number(limit) || 3);
+
+  // Normalize any explicit preferred days provided with the request
+  const studentPreferredDays = normalizeArray(preferredDays);
 
   // Fetch student profile by user id (per project conventions)
   const student = await StudentProfile.findOne({ user: studentId }).lean().catch(() => null);
@@ -190,11 +209,26 @@ export async function recommendMentors({ studentId, limit = 3 } = {}) {
     const slotsCount = Array.isArray(rawSlots) ? rawSlots.length : 0;
     const skillOverlap = overlapCount(studentSkills, expertise);
 
+    const availabilityTokens = normalizeArray(rawSlots);
+    const dayOverlap = overlapCount(studentPreferredDays, availabilityTokens);
+
+
     const skillMatch = skillOverlap / totalStudentSkills; // 0..1
     const availabilityScore = maxSlots > 0 ? Math.min(1, slotsCount / maxSlots) : 0; // 0..1
     const ratingScore = (Number.isFinite(rating) ? rating : 3) / 5; // 0..1
 
-    const score = (skillMatch * 0.5) + (availabilityScore * 0.3) + (ratingScore * 0.2);
+    const dayScore = studentPreferredDays.length
+      ? Math.min(1, dayOverlap / studentPreferredDays.length)
+      : 0; // 0..1
+
+    let score;
+    if (studentPreferredDays.length) {
+      // If the student specified preferred days, weight them into the score
+      score = (skillMatch * 0.4) + (availabilityScore * 0.2) + (dayScore * 0.3) + (ratingScore * 0.1);
+    } else {
+      // Original weighting when no explicit day preferences are sent
+      score = (skillMatch * 0.5) + (availabilityScore * 0.3) + (ratingScore * 0.2);
+    }
 
     const mentorId = (m && (m.user || m._id)) ? String(m.user || m._id) : "";
     const ratingDisplay = Number.isFinite(rating) ? Math.round(rating * 10) / 10 : 3;
@@ -204,13 +238,34 @@ export async function recommendMentors({ studentId, limit = 3 } = {}) {
       .filter(Boolean)
       .slice(0, 5);
 
-    const reasons = [
-      `Skill match: ${skillOverlap} overlapping skills`,
+    const reasons = [];
+
+    // Skill reason
+    if (skillOverlap > 0) {
+      // With the current student flow there is typically a single chosen area,
+      // so a simpler message is clearer than "1 overlapping skills".
+      reasons.push("Matches your learning goal");
+    } else {
+      reasons.push("Different area than your selected goal");
+    }
+
+    // Availability reason
+    reasons.push(
       availabilityPreview.length
         ? `Availability: ${availabilityPreview.join(", ")}`
-        : "Availability: not set",
-      `Rating: ${ratingDisplay}/5`,
-    ];
+        : "Availability: not set"
+    );
+
+    // Rating reason
+    reasons.push(`Rating: ${ratingDisplay}/5`);
+
+    if (studentPreferredDays.length) {
+      if (dayOverlap > 0) {
+        reasons.push("Matches your preferred days");
+      } else {
+        reasons.push("Does not exactly match preferred days, but may still be suitable");
+      }
+    }
 
     return { mentorId, score, reasons, availabilityPreview, availabilityCount: slotsCount };
   });

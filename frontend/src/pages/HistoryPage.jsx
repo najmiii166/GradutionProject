@@ -1,10 +1,15 @@
 // frontend/src/pages/HistoryPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { api } from "../api/axios";
+import { Navigate, useNavigate } from "react-router-dom";
+import { api, setAuthToken } from "../api/axios";
 import { motion } from "framer-motion";
 import FeedbackModal from "../components/FeedbackModal";
 import FeedbackListModal from "../components/FeedbackListModal";
+import FollowUpRequestModal from "../components/student/FollowUpRequestModal";
+import StudentSidebar from "../components/student/StudentSidebar";
+import MentorSidebar from "../components/mentor/MentorSidebar";
+import useMentorRequests from "../hooks/useMentorRequests";
+import useMentorSessions from "../hooks/useMentorSessions";
 import {
   History,
   CheckCircle,
@@ -25,14 +30,23 @@ function formatDuration(start, end) {
 export default function HistoryPage() {
   const role = localStorage.getItem("role");
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("history");
+  const isStudent = role === "student";
+  const isMentor = role === "mentor";
+  const { requests = [] } = isMentor ? useMentorRequests(() => {}) : { requests: [] };
+  const { upcomingSessions = [] } = isMentor ? useMentorSessions(() => {}) : { upcomingSessions: [] };
 
   if (!token) return <Navigate to="/login" />;
+
+  setAuthToken(token);
 
   const [data, setData] = useState({});
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [openFeedbackSession, setOpenFeedbackSession] = useState(null);
   const [openFeedbackListSession, setOpenFeedbackListSession] = useState(null);
+  const [followUpSession, setFollowUpSession] = useState(null);
 
   /* ---------------- LOAD HISTORY ---------------- */
   useEffect(() => {
@@ -67,22 +81,88 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground/40 gap-4">
-        <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em]">Loading history...</p>
+      <div className="relative min-h-screen bg-background text-foreground/40">
+        {isStudent && (
+          <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+        )}
+        {isMentor && (
+          <MentorSidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            navigate={navigate}
+            requestsCount={requests.length}
+            upcomingCount={upcomingSessions.length}
+          />
+        )}
+        <div className={`${isStudent || isMentor ? "ml-20" : ""} min-h-screen px-8 py-12 space-y-8`}>
+          <div className="max-w-6xl mx-auto space-y-8">
+            {/* Header skeleton */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="h-8 w-64 rounded-xl bg-foreground/10 animate-pulse" />
+              <div className="flex gap-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-10 w-24 rounded-xl bg-foreground/5 animate-pulse" />
+                ))}
+              </div>
+            </div>
+
+            {/* Section title skeleton */}
+            <div className="h-4 w-40 rounded-full bg-foreground/10 animate-pulse" />
+
+            {/* Card list skeleton */}
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-2xl border border-border/50 bg-card/40 p-5 animate-pulse"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 rounded-2xl bg-foreground/10" />
+                      <div className="space-y-2">
+                        <div className="h-4 w-48 rounded-full bg-foreground/10" />
+                        <div className="flex gap-3">
+                          <div className="h-3 w-24 rounded-full bg-foreground/10" />
+                          <div className="h-3 w-20 rounded-full bg-foreground/10" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-20 rounded-full bg-foreground/10" />
+                      <div className="h-6 w-16 rounded-full bg-foreground/10" />
+                      <div className="h-6 w-24 rounded-full bg-foreground/10" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="relative min-h-screen bg-background text-foreground selection:bg-primary/30">
+      {isStudent && (
+        <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+      )}
+      {isMentor && (
+        <MentorSidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          navigate={navigate}
+          requestsCount={requests.length}
+          upcomingCount={upcomingSessions.length}
+        />
+      )}
       {/* Strategic Background Accents */}
       <div className="fixed inset-0 pointer-events-none -z-10">
         <div className="absolute top-[-10%] left-[-10%] h-[40%] w-[40%] bg-primary/5 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] h-[40%] w-[40%] bg-primary/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-16">
+      <div className={`max-w-6xl mx-auto px-8 py-16 ${isStudent || isMentor ? "ml-20" : ""}`}>
         {/* HEADER SECTION */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -221,6 +301,14 @@ export default function HistoryPage() {
                               View Feedback
                             </button>
                           )}
+                          {completed && role === "student" && (
+                            <button
+                              onClick={() => setFollowUpSession(s)}
+                              className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 transition"
+                            >
+                              Request Follow-up
+                            </button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -244,6 +332,16 @@ export default function HistoryPage() {
         <FeedbackListModal
           session={openFeedbackListSession}
           onClose={() => setOpenFeedbackListSession(null)}
+        />
+      )}
+
+      {followUpSession && (
+        <FollowUpRequestModal
+          session={followUpSession}
+          onClose={() => setFollowUpSession(null)}
+          onSubmitted={() => {
+            setFollowUpSession(null);
+          }}
         />
       )}
     </div>

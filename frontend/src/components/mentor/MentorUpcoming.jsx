@@ -16,7 +16,6 @@ import { api } from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 // Import your existing hook
 import useCountdown from "../../hooks/useCountdown";
-import { useState, useMemo, useEffect } from "react";
 import { isJoinWindowOpen, getJoinWindowState } from "../../utils/joinWindow";
 
 const isValidMeetLink = (link) =>
@@ -25,41 +24,43 @@ const isValidMeetLink = (link) =>
 /* =========================
    SESSION ITEM
 ========================= */
-function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh }) {
-  // Use your global hook for the start time
+function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh, showBadge }) {
+  // Use global countdown hook for the session start time
   const countdown = useCountdown(s.startTime);
-  
+
   const now = new Date();
   const startTime = new Date(s.startTime);
   const endTime = new Date(s.endTime);
-  
+
   const isOngoing = now >= startTime && now <= endTime;
   const isPast = now > endTime;
-  const showJoin = isOngoing && s.meetingLink && ["upcoming", "ongoing"].includes(s.status);
-
-/* =========================
-   SESSION ITEM (SAFE)
-function SessionItem({
-  s,
-  onOpenMeet,
-  onChat,
-  onViewStudent,
-}) {
-  const { label } = useSessionCountdown(
-    s.startTime,
-    s.endTime
-  );
 
   // Strict join window: visible from 5 minutes before start until end
-  const windowOpen = typeof s.canJoin === "boolean" ? s.canJoin : isJoinWindowOpen(s.startTime, s.endTime, 5);
+  const windowOpen =
+    typeof s.canJoin === "boolean"
+      ? s.canJoin
+      : isJoinWindowOpen(s.startTime, s.endTime, 5);
   const joinState = getJoinWindowState(s.startTime, s.endTime, 5);
   const showJoin =
     windowOpen &&
     s.meetingLink &&
     ["upcoming", "ongoing"].includes(s.status);
 
+  const isCritical =
+    !isOngoing &&
+    !isPast &&
+    countdown.days === 0 &&
+    countdown.hours === 0 &&
+    countdown.minutes <= 5;
+
+  const getTimerLabel = () => {
+    if (isOngoing) return "Ongoing now";
+    if (isPast) return "Completed";
+    return countdown.text || "Starting soon";
+  };
+
   return (
-    <motion.li
+    <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ scale: 1.01 }}
@@ -102,6 +103,20 @@ function SessionItem({
           s.meetingLink && joinState === "before" && ["upcoming", "ongoing"].includes(s.status) ? (
             <span className="text-xs text-slate-400">Available 5 minutes before start</span>
           ) : null
+        )}
+
+        {showBadge && (
+          <div className="ml-3">
+            {s.isFollowUp ? (
+              <span className="px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-black uppercase tracking-widest text-cyan-600">
+                Follow-up
+              </span>
+            ) : (
+              <span className="px-2 py-1 rounded-full bg-foreground/10 border border-border/40 text-[9px] font-black uppercase tracking-widest text-foreground/60">
+                New Session
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -152,14 +167,14 @@ function SessionItem({
           Profile <ChevronRight size={12} className="group-hover/btn:translate-x-0.5 transition-transform" />
         </button>
       </div>
-    </motion.li>
+    </motion.div>
   );
 }
 
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStudent }) {
+export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStudent, onSeeMore, maxVisible, gridVariant = "single", showBadge = false, isSyncing = false }) {
   const navigate = useNavigate();
   const [showMeetModal, setShowMeetModal] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
@@ -167,6 +182,12 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
   const [saving, setSaving] = useState(false);
 
   const isValid = useMemo(() => isValidMeetLink(meetingLink), [meetingLink]);
+
+  const visibleSessions = maxVisible ? sessions.slice(0, maxVisible) : sessions;
+  const hasOverflow = maxVisible && sessions.length > maxVisible;
+  const gridClass = gridVariant === "multi"
+    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+    : "space-y-4";
 
   const openChat = async (studentId) => {
     const mentorId = JSON.parse(localStorage.getItem("user"))?._id;
@@ -195,12 +216,17 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
             </div>
           </div>
 
-          <button
-            onClick={onRefresh}
-            className="px-3 py-1 rounded-full bg-foreground/[0.03] border border-border/50 text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-cyan-500 hover:border-cyan-500/30 transition-all"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {isSyncing && (
+              <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">Syncing…</span>
+            )}
+            <button
+              onClick={onRefresh}
+              className="px-3 py-1 rounded-full bg-foreground/[0.03] border border-border/50 text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-cyan-500 hover:border-cyan-500/30 transition-all"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0">
@@ -220,8 +246,8 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
               </p>
             </motion.div>
           ) : (
-            <ul className="space-y-4">
-              {sessions.map((s) => (
+            <div className={gridClass}>
+              {visibleSessions.map((s) => (
                 <SessionItem
                   key={s._id}
                   s={s}
@@ -229,11 +255,24 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
                   onChat={openChat}
                   onViewStudent={onViewStudent}
                   onRefresh={onRefresh}
+                  showBadge={showBadge}
                 />
               ))}
-            </ul>
+            </div>
           )}
         </div>
+
+        {hasOverflow && onSeeMore && !loading && (
+          <div className="pt-3 mt-4 border-t border-border/20 flex justify-end">
+            <button
+              onClick={onSeeMore}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-600 hover:text-cyan-500"
+            >
+              See more
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* GOOGLE MEET MODAL REMAINS THE SAME */}

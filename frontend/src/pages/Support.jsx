@@ -1,14 +1,24 @@
 // src/pages/Support.jsx
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { setAuthToken } from '../api/axios';
 import SupportForm from '../components/SupportForm';
 import { motion } from "framer-motion";
 import { CheckCircle2, ShieldQuestion } from "lucide-react";
+import StudentSidebar from "../components/student/StudentSidebar";
+import MentorSidebar from "../components/mentor/MentorSidebar";
+import useMentorRequests from "../hooks/useMentorRequests";
+import useMentorSessions from "../hooks/useMentorSessions";
 
 export default function Support() {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("support");
+  const isStudent = role === 'student';
+  const isMentor = role === 'mentor';
+  const { requests = [] } = isMentor ? useMentorRequests(() => {}) : { requests: [] };
+  const { upcomingSessions = [] } = isMentor ? useMentorSessions(() => {}) : { upcomingSessions: [] };
   
   if (!token) return <Navigate to="/login" />;
   if (!['student', 'mentor', 'admin'].includes(role)) return <Navigate to="/" />;
@@ -17,11 +27,24 @@ export default function Support() {
   const [success, setSuccess] = useState(null);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex-1 min-h-[calc(100vh-64px)] flex flex-col items-center justify-center p-6"
-    >
+    <div className="relative min-h-screen bg-background text-foreground">
+      {isStudent && (
+        <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+      )}
+      {isMentor && (
+        <MentorSidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          navigate={navigate}
+          requestsCount={requests.length}
+          upcomingCount={upcomingSessions.length}
+        />
+      )}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className={`${isStudent || isMentor ? "ml-20" : ""} flex-1 min-h-screen flex flex-col items-center justify-center p-6`}
+      >
       <div className="w-full max-w-xl">
         
         {/* 1. COMPACT HEADER */}
@@ -71,6 +94,7 @@ export default function Support() {
         </motion.div>
 
       </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

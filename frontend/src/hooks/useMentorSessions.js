@@ -4,16 +4,25 @@ import { api } from "../api/axios";
 export default function useMentorSessions(setToast) {
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [syncingSessions, setSyncingSessions] = useState(false);
 
-  const fetchUpcomingSessions = async () => {
-    setLoadingSessions(true);
+  const fetchUpcomingSessions = async (background = false) => {
+    if (background) {
+      setSyncingSessions(true);
+    } else {
+      setLoadingSessions(true);
+    }
     try {
       const { data } = await api.get("/requests/mentor/upcoming");
       setUpcomingSessions(data || []);
     } catch {
       setToast && setToast("Failed to load sessions.");
     } finally {
-      setLoadingSessions(false);
+      if (background) {
+        setSyncingSessions(false);
+      } else {
+        setLoadingSessions(false);
+      }
     }
   };
 
@@ -22,5 +31,5 @@ export default function useMentorSessions(setToast) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { upcomingSessions, loadingSessions, fetchUpcomingSessions, setUpcomingSessions };
+  return { upcomingSessions, loadingSessions, syncingSessions, fetchUpcomingSessions, setUpcomingSessions };
 }

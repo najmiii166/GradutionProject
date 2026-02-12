@@ -7,12 +7,17 @@ import Toast from "../components/Toast";
 import { motion } from "framer-motion";
 import { Search, RefreshCcw, ArrowLeft, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import StudentSidebar from "../components/student/StudentSidebar";
 
 export default function AllMentors() {
   const token = localStorage.getItem("token");
   setAuthToken(token);
 
+  const role = localStorage.getItem("role");
+  const isStudent = role === "student";
+
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("mentors");
 
   const [mentors, setMentors] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -64,39 +69,37 @@ export default function AllMentors() {
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-6 py-10 selection:bg-cyan-500/30">
+    <div className="relative min-h-screen bg-background text-foreground">
+      {isStudent && (
+        <StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} navigate={navigate} />
+      )}
+      <div className={`${isStudent ? "ml-20" : ""} min-h-screen px-6 py-10 selection:bg-cyan-500/30`}>
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="group p-2.5 rounded-xl border border-border/40 bg-foreground/[0.02] hover:bg-foreground/[0.05] hover:border-cyan-500/40 transition-all duration-300"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground/60 group-hover:text-cyan-500 transition-colors" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-semibold uppercase tracking-tighter ">
-              Matching <span className="text-cyan-500">Mentors</span>
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/30">
-               {filteredMentors.length} Verified Mentors
-            </p>
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold uppercase tracking-tighter ">
+                Matching <span className="text-cyan-500">Mentors</span>
+              </h1>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/30">
+                 {filteredMentors.length} Verified Mentors
+              </p>
+            </div>
+          </div>
+
+          {/* SEARCH BAR */}
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/50" />
+            <input
+              type="text"
+              placeholder="Search by name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 rounded-xl bg-foreground/[0.02] border border-border/40 text-[11px] font-bold  tracking-widest focus:outline-none focus:border-cyan-500/50 focus:bg-foreground/[0.04] transition-all"
+            />
           </div>
         </div>
-
-        {/* SEARCH BAR */}
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/50" />
-          <input
-            type="text"
-            placeholder="Search by name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 rounded-xl bg-foreground/[0.02] border border-border/40 text-[11px] font-bold  tracking-widest focus:outline-none focus:border-cyan-500/50 focus:bg-foreground/[0.04] transition-all"
-          />
-        </div>
-      </div>
 
       {/* FILTERS BAR */}
       <div className="flex flex-wrap items-center gap-3 mb-8 p-2 border-b border-border/20">
@@ -150,67 +153,7 @@ export default function AllMentors() {
         </button>
       </div>
 
-      {/* Filters Section */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 mb-6 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col md:flex-row items-center gap-3">
-
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by mentor name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm focus:border-sky-500"
-            />
-          </div>
-
-          <select
-            value={universityFilter}
-            onChange={(e) => setUniversityFilter(e.target.value)}
-            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
-          >
-            <option value="">University</option>
-            {[...new Set(mentors.map((m) => m.user?.university).filter(Boolean))].map((u, idx) => (
-              <option key={`${u}-${idx}`} value={u}>{u}</option>
-            ))}
-          </select>
-
-          <select
-            value={dayFilter}
-            onChange={(e) => setDayFilter(e.target.value)}
-            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
-          >
-            <option value="">Availability</option>
-            {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d, idx) => (
-              <option key={`${d}-${idx}`} value={d}>{d}</option>
-            ))}
-          </select>
-
-          <select
-            value={experienceFilter}
-            onChange={(e) => setExperienceFilter(e.target.value)}
-            className="px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700 text-sm"
-          >
-            <option value="">Experience</option>
-            {[1, 2, 3, 5, 10, 15].map((y, idx) => (
-              <option key={`${y}-${idx}`} value={y}>{y}+ years</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => {
-              setSearch("");
-              setUniversityFilter("");
-              setDayFilter("");
-              setExperienceFilter("");
-            }}
-            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs text-sky-400 hover:text-sky-300"
-          >
-            <RefreshCcw className="w-4 h-4" /> Reset
-          </button>
-        </div>
-      </div>
+      
 
       {/* Mentors List */}
       {loading ? (
@@ -257,6 +200,7 @@ export default function AllMentors() {
       )}
 
       <Toast message={toast} onClose={() => setToast(null)} />
+      </div>
     </div>
   );
 }

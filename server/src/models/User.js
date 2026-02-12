@@ -10,7 +10,7 @@ const UserSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "verified", "rejected", "suspended"],
+      enum: ["pending", "verified", "unverified", "rejected", "suspended"],
       default: "pending",
     },
     verifiedAt: { type: Date },

@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 
 export default function SidebarButton({ icon, label, active, onClick, disabled, collapsed }) {
   return (
-    <button
+    <motion.button
+      layout
+      transition={{ type: "spring", stiffness: 260, damping: 24 }}
       disabled={disabled}
       onClick={!disabled ? onClick : undefined}
       className={`
@@ -13,7 +15,7 @@ export default function SidebarButton({ icon, label, active, onClick, disabled, 
         ${collapsed ? "justify-center p-3" : "gap-3 px-4 py-3"}
         ${active 
           ? "text-cyan-500 dark:text-cyan-400 font-bold" 
-          : "text-foreground/60 hover:text-foreground hover:bg-foreground/[0.03]"
+          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-foreground/[0.03]"
         }
       `}
     >
@@ -44,9 +46,11 @@ export default function SidebarButton({ icon, label, active, onClick, disabled, 
 
       {!collapsed && (
         <motion.span
+          layout
           initial={false}
           animate={{ opacity: 1, x: 0 }}
           className="relative z-10 text-sm tracking-tight whitespace-nowrap"
+          transition={{ type: "spring", stiffness: 260, damping: 24 }}
         >
           {label}
         </motion.span>
@@ -55,6 +59,6 @@ export default function SidebarButton({ icon, label, active, onClick, disabled, 
       {!active && !collapsed && (
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 to-cyan-500/[0.02] opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity" />
       )}
-    </button>
+    </motion.button>
   );
 }

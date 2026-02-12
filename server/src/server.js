@@ -85,7 +85,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"]
-}));
+};
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // ✅ IMPORTANT: preflight uses SAME options

@@ -10,7 +10,7 @@ import Report from "../models/Report.js";
 import Request from "../models/Request.js";
 import { getGlobalMetrics, safeAggregate } from "../utils/metrics.js";
 import mongoose from 'mongoose';
-import { sendUserApprovedEmail, sendUserRejectedEmail } from "../services/mailer.js";
+import { sendUserApprovedEmail, sendUserRejectedEmail, sendUserUnverifiedEmail } from "../services/mailer.js";
 
 const router = express.Router();
 
@@ -615,6 +615,44 @@ router.post(
   }
 );
 
+// ================== UNVERIFY USER ==================
+router.post(
+  "/users/:id/unverify",
+  auth,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const reason = (req.body?.reason || "").trim();
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { status: "unverified", verifiedAt: null },
+        { new: true }
+      );
+
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      let emailStatus = "not-sent";
+      try {
+        await sendUserUnverifiedEmail({
+          to: user.email,
+          name: user.fullName,
+          role: user.role,
+          reason,
+        });
+        emailStatus = "sent";
+      } catch (emailErr) {
+        console.error("Unverify user email error:", emailErr);
+        emailStatus = "failed";
+      }
+
+      res.json({ message: "User moved to unverified", user, emailStatus });
+    } catch (err) {
+      console.error("Unverify user error:", err);
+      res.status(500).json({ message: "Failed to unverify user" });
+    }
+  }
+);
+
 // ================== REJECT USER ==================
 router.post(
   "/users/:id/reject",
@@ -622,15 +660,11 @@ router.post(
   requireRole("admin"),
   async (req, res) => {
     try {
-      const user = await User.findByIdAndUpdate(
-        req.params.id,
-        { status: "rejected" },
-        { new: true }
-      );
+      const user = await User.findById(req.params.id);
 
       if (!user) return res.status(404).json({ message: "User not found" });
-      let emailStatus = "not-sent";
 
+      let emailStatus = "not-sent";
       try {
         await sendUserRejectedEmail({
           to: user.email,
@@ -643,7 +677,16 @@ router.post(
         emailStatus = "failed";
       }
 
-      res.json({ message: "User rejected", user, emailStatus });
+      // Remove associated profiles before deleting the user
+      if (user.role === "mentor") {
+        await MentorProfile.deleteOne({ user: user._id });
+      } else if (user.role === "student") {
+        await StudentProfile.deleteOne({ user: user._id });
+      }
+
+      await User.deleteOne({ _id: user._id });
+
+      res.json({ message: "User rejected and removed", emailStatus });
     } catch (err) {
       console.error("Reject user error:", err);
       res.status(500).json({ message: "Failed to reject user" });
@@ -685,12 +728,12 @@ router.get("/analytics", auth, requireRole("admin"), async (req, res) => {
   }
 });
 
-// ================== GET USERS BY STATUS (verified / rejected) ==================
+// ================== GET USERS BY STATUS (verified / unverified) ==================
 router.get("/users", auth, requireRole("admin"), async (req, res) => {
   try {
     const status = req.query.status;
 
-    if (!["verified", "rejected"].includes(status)) {
+    if (!["verified", "unverified"].includes(status)) {
       return res.status(400).json({ message: "Invalid status filter" });
     }
 

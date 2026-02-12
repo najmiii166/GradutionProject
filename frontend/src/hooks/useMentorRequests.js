@@ -4,21 +4,32 @@ import { api } from "../api/axios";
 export default function useMentorRequests(setToast) {
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [syncingRequests, setSyncingRequests] = useState(false);
+
+  const fetchRequests = async (background = false) => {
+    if (background) {
+      setSyncingRequests(true);
+    } else {
+      setLoadingRequests(true);
+    }
+    try {
+      const { data } = await api.get("/requests/mentor");
+      setRequests(data || []);
+    } catch {
+      setToast && setToast("Failed to load mentorship requests.");
+    } finally {
+      if (background) {
+        setSyncingRequests(false);
+      } else {
+        setLoadingRequests(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await api.get("/requests/mentor");
-        if (mounted) setRequests(data || []);
-      } catch {
-        setToast && setToast("Failed to load mentorship requests.");
-      } finally {
-        if (mounted) setLoadingRequests(false);
-      }
-    })();
-    return () => (mounted = false);
-  }, [setToast]);
+    fetchRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRequestAction = async (reqId, action, { setNotifications, fetchUpcomingSessions } = {}) => {
     try {
@@ -41,5 +52,5 @@ export default function useMentorRequests(setToast) {
     }
   };
 
-  return { requests, setRequests, loadingRequests, handleRequestAction };
+  return { requests, setRequests, loadingRequests, syncingRequests, fetchRequests, handleRequestAction };
 }
