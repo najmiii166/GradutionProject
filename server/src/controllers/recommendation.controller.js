@@ -27,7 +27,9 @@ export async function getMentorRecommendations(req, res, next) {
     if (!Number.isFinite(limit) || limit <= 0) limit = 3;
     limit = Math.min(10, Math.max(1, Math.floor(limit)));
 
-    const recommended = await recommendMentors({ studentId, limit });
+    const preferredDays = q.preferredDays;
+
+    const recommended = await recommendMentors({ studentId, limit, preferredDays });
 
     return res.json({ success: true, data: { studentId, recommended } });
   } catch (err) {

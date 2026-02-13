@@ -4,7 +4,8 @@ import Brand from "../Brand";
 import SidebarButton from "./SidebarButton";
 import { 
   Home, Users, Clock, LogOut, FileText, 
-  Menu, X, ShieldCheck, ChevronLeft, Sun, Moon 
+  Menu, X, ShieldCheck, Sun, Moon, 
+  PanelLeftOpen, PanelLeftClose
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -52,27 +53,17 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
     const showLabel = mobile || !isCollapsed;
 
     return (
-      <div className="flex flex-col h-full bg-background/80 backdrop-blur-xl border-r border-border/50 transition-all duration-300">
+      <div className="flex flex-col h-full bg-sidebar backdrop-blur-xl border-r border-border/50 transition-all duration-300">
         
         {/* 1. BRAND HEADER */}
         <div className={`px-6 py-8 border-b border-border/50 flex flex-col ${!showLabel ? 'items-center' : ''}`}>
           <div className="flex items-center">
              <Brand className={`${showLabel ? 'scale-110 origin-left' : 'scale-100'} transition-transform`} hideText={!showLabel} />
           </div>
-          
-          {showLabel && (
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              className="mt-4 flex items-center gap-2"
-            >
-              <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-              <p className="text-[10px] uppercase tracking-[0.2em] text-foreground/40 font-bold">
-                Admin <span className="italic font-serif text-cyan-500/80">Control.</span>
-              </p>
-            </motion.div>
-          )}
+       
+           
         </div>
+        
 
         {/* 2. NAVIGATION */}
         <nav className={`flex-1 ${!showLabel ? 'px-2' : 'px-4'} py-8 space-y-2`}>
@@ -105,15 +96,15 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
         </nav>
 
         {/* 3. BOTTOM SECTION: THEME & LOGOUT */}
-        <div className={`p-4 border-t border-border/50 bg-foreground/[0.02] space-y-2`}>
+        <div className={`p-4 border-t border-border/50 bg-sidebar-foreground/[0.02] space-y-2`}>
           {/* Theme Toggle */}
           <button
             onClick={() => setIsDark(!isDark)}
-            className={`w-full flex items-center gap-4 p-3 rounded-xl hover:bg-foreground/5 transition-colors ${!showLabel ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-4 p-3 rounded-xl hover:bg-sidebar-foreground/5 transition-colors ${!showLabel ? 'justify-center' : ''}`}
           >
             {isDark ? <Sun size={18} className="text-orange-400" /> : <Moon size={18} className="text-cyan-500" />}
             {showLabel && (
-              <span className="text-[10px] uppercase tracking-widest text-foreground/60 font-bold">
+              <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/60 font-bold">
                 {isDark ? "Light Mode" : "Dark Mode"}
               </span>
             )}
@@ -123,8 +114,8 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
           <div className={`flex items-center ${!showLabel ? 'justify-center' : 'justify-between px-2'}`}>
             {showLabel && (
               <div className="flex flex-col">
-                <p className="text-[10px] uppercase tracking-widest text-foreground/30 font-bold">Session</p>
-                <p className="text-sm font-medium text-foreground/80 italic font-serif">Admin</p>
+                <p className="text-[10px] uppercase tracking-widest text-sidebar-foreground/30 font-bold">Session</p>
+                <p className="text-sm font-medium text-sidebar-foreground/80 italic font-serif">Admin</p>
               </div>
             )}
             <button 
@@ -151,13 +142,17 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
 
       {/* DESKTOP SIDEBAR */}
       <aside 
-        className={`hidden lg:flex fixed left-0 top-0 h-screen z-50 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}
+        className={`hidden lg:flex fixed left-0 top-0 h-screen z-50 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-10 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center text-white z-[60] shadow-lg hover:scale-110 transition-transform"
+          className="absolute -right-3 top-3 w-7 h-7 rounded-lg bg-sidebar-foreground/10 border border-border text-sidebar-foreground flex items-center justify-center z-[60] shadow-md hover:bg-sidebar-foreground/15 transition-all"
         >
-          <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+          {isCollapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
         </button>
         
         <SidebarContent />
@@ -175,7 +170,7 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
         )}
       </AnimatePresence>
 
-      <div className={`hidden lg:block shrink-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`} />
+      <div className={`hidden lg:block shrink-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`} />
     </>
   );
 }

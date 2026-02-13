@@ -1,14 +1,23 @@
 // src/components/mentor/MentorSidebar.jsx
 import { useState, useEffect } from "react";
 import { 
-  LayoutGrid, MessageCircle, LifeBuoy, Clock, 
-  LogOut, Sun, Moon 
+  LayoutGrid, MessageCircle, LifeBuoy, Clock, CalendarClock,
+  LogOut, Sun, Moon, Inbox
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Brand from "../Brand";
 import ChatNotificationBadge from "../ChatNotificationBadge";
 
-export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
+export default function MentorSidebar({ 
+  activeTab, 
+  setActiveTab, 
+  navigate,
+  requestsCount = 0,
+  upcomingCount = 0,
+  onGoRequests,
+  onGoUpcoming,
+  onGoHome,
+}) {
   // 1. Theme Logic
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -31,8 +40,29 @@ export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
     }
   }, [isDark]);
 
+  // Build nav with adjacent incoming/upcoming shortcuts (always available)
   const navItems = [
-    { id: "home", label: "Dashboard", icon: LayoutGrid, path: null },
+    {
+      id: "home",
+      label: "Dashboard",
+      icon: LayoutGrid,
+      path: onGoHome ? null : "/mentor/dashboard",
+      onClick: onGoHome,
+    },
+    {
+      id: "requests",
+      label: `Incoming (${requestsCount})`,
+      icon: Inbox,
+      path: onGoRequests ? null : "/mentor/requests",
+      onClick: onGoRequests,
+    },
+    {
+      id: "upcoming",
+      label: `Upcoming (${upcomingCount})`,
+      icon: CalendarClock,
+      path: onGoUpcoming ? null : "/mentor/upcoming",
+      onClick: onGoUpcoming,
+    },
     { id: "chat", label: "Messages", icon: MessageCircle, path: "/chat" },
     { id: "support", label: "Support", icon: LifeBuoy, path: "/support" },
     { id: "history", label: "History", icon: Clock, path: "/history" },
@@ -47,7 +77,7 @@ export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-20 bg-background/80 backdrop-blur-xl border-r border-border/50 flex flex-col items-center py-8 z-50">
+    <aside className="fixed left-0 top-0 h-full w-20 bg-sidebar backdrop-blur-xl border-r border-border/50 flex flex-col items-center py-8 z-50 transition-colors duration-300">
       
       {/* 1. BRAND */}
       <div className="mb-12">
@@ -63,12 +93,13 @@ export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
               onMouseLeave={() => setHoveredTab(null)}
               onClick={() => {
                 setActiveTab(item.id);
+                if (item.onClick) item.onClick();
                 if (item.path) navigate(item.path);
               }}
               className={`p-3 rounded-2xl transition-all duration-300 relative ${
                 activeTab === item.id 
                   ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20" 
-                  : "text-foreground/40 hover:bg-foreground/5 hover:text-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
               }`}
             >
               <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
@@ -91,7 +122,7 @@ export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  className="absolute left-16 px-3 py-1.5 bg-foreground text-background text-[10px] font-bold uppercase tracking-widest rounded-lg pointer-events-none whitespace-nowrap shadow-xl z-[60]"
+                  className="absolute left-16 px-3 py-1.5 bg-sidebar text-sidebar-foreground text-[10px] font-bold uppercase tracking-widest rounded-lg pointer-events-none whitespace-nowrap shadow-xl z-[60] border border-border"
                 >
                   {item.label}
                 </motion.div>
@@ -107,7 +138,7 @@ export default function MentorSidebar({ activeTab, setActiveTab, navigate }) {
         {/* Theme Toggle */}
         <button
           onClick={() => setIsDark(!isDark)}
-          className="p-3 rounded-2xl text-foreground/40 hover:bg-foreground/5 hover:text-foreground transition-all"
+          className="p-3 rounded-2xl text-sidebar-foreground/50 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground transition-all"
         >
           {isDark ? (
             <Sun size={20} className="text-orange-400" />

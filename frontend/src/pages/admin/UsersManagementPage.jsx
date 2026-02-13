@@ -1,9 +1,9 @@
 // frontend/src/pages/admin/UsersManagementPage.jsx
 import { motion } from "framer-motion";
-import { UserCheck, UserX, Search, Mail, Calendar, GraduationCap } from "lucide-react";
+import { UserCheck, ShieldAlert, Search, Mail, Calendar, GraduationCap } from "lucide-react";
 import { universities } from "../../constants/systemData";
 
-export default function UsersManagementPage({ users, loading, view, setView }) {
+export default function UsersManagementPage({ users, loading, view, setView, handleUnverify, handleVerify }) {
   return (
     <section className="p-4 md:p-8 flex flex-col gap-6 max-w-[1600px] mx-auto min-h-screen">
       
@@ -12,9 +12,10 @@ export default function UsersManagementPage({ users, loading, view, setView }) {
         <div className="inline-flex p-1 bg-foreground/[0.03] border border-border/50 rounded-2xl backdrop-blur-md">
           {[
             { id: "verified", label: "Verified", icon: UserCheck, color: "text-emerald-500" },
-            { id: "rejected", label: "Rejected", icon: UserX, color: "text-red-500" },
+            { id: "unverified", label: "Unverified", icon: ShieldAlert, color: "text-amber-500" },
           ].map((tab) => (
-            <button
+            <motion.button
+              layout
               key={tab.id}
               onClick={() => setView(tab.id)}
               className={`
@@ -25,13 +26,13 @@ export default function UsersManagementPage({ users, loading, view, setView }) {
               {view === tab.id && (
                 <motion.div 
                   layoutId="viewTab"
-                  className={`absolute inset-0 rounded-xl ${view === 'verified' ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  className={`absolute inset-0 rounded-xl ${view === 'verified' ? 'bg-emerald-500' : 'bg-amber-500'}`}
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
               <tab.icon className="relative z-10 w-4 h-4" />
               <span className="relative z-10">{tab.label}</span>
-            </button>
+            </motion.button>
           ))}
         </div>
 
@@ -69,6 +70,7 @@ export default function UsersManagementPage({ users, loading, view, setView }) {
                   <th className="py-6 px-8 text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/40">Role</th>
                   <th className="py-6 px-8 text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/40 hidden md:table-cell">Institution</th>
                   <th className="py-6 px-8 text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/40 hidden lg:table-cell text-right">Join Date</th>
+                  <th className="py-6 px-8 text-[10px] uppercase tracking-[0.2em] font-bold text-foreground/40 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -114,6 +116,25 @@ export default function UsersManagementPage({ users, loading, view, setView }) {
                         <Calendar size={12} />
                         {new Date(u.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                       </div>
+                    </td>
+                    <td className="py-5 px-8 text-right">
+                      {view === "verified" ? (
+                        <button
+                          onClick={() => handleUnverify?.(u)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-amber-500/30 text-amber-600 text-xs font-bold hover:bg-amber-500/10 transition-all"
+                        >
+                          <ShieldAlert size={14} />
+                          Unverify
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleVerify?.(u._id)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 text-xs font-bold hover:bg-emerald-500/10 transition-all"
+                        >
+                          <UserCheck size={14} />
+                          Verify
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}

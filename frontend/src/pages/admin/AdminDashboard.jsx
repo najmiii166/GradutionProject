@@ -28,6 +28,8 @@ export default function AdminDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [usersList, setUsersList] = useState([]);
   const [usersView, setUsersView] = useState("verified");
+  const [reasonModalUser, setReasonModalUser] = useState(null);
+  const [reasonText, setReasonText] = useState("");
 
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -147,6 +149,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUnverify = async (userId, reason) => {
+    try {
+      await api.post(`/admin/users/${userId}/unverify`, { reason });
+      setToast("User moved to unverified");
+      setUsersList((prev) => prev.filter((u) => u._id !== userId));
+      closeDetails();
+      setReasonModalUser(null);
+      setReasonText("");
+      fetchStats();
+    } catch {
+      setToast("Failed to unverify user.");
+    }
+  };
+
+  const handleVerify = async (userId) => {
+    try {
+      await api.post(`/admin/users/${userId}/approve`);
+      setToast("User verified ✅");
+      setUsersList((prev) => prev.filter((u) => u._id !== userId));
+      fetchStats();
+    } catch {
+      setToast("Failed to verify user.");
+    }
+  };
+
   const modalUser = detail?.user || selectedUser;
   const modalProfile = detail?.profile || null;
 
@@ -195,6 +222,11 @@ export default function AdminDashboard() {
                   loading={loading}
                   view={usersView}
                   setView={setUsersView}
+                  handleUnverify={(user) => {
+                    setReasonModalUser(user);
+                    setReasonText("");
+                  }}
+                  handleVerify={handleVerify}
                 />
 
                 
@@ -214,7 +246,7 @@ export default function AdminDashboard() {
           <DetailsModal
             {...{
               modalUser, modalProfile, detailLoading,
-              closeDetails, handleApprove, handleReject,
+                closeDetails, handleApprove, handleReject,
             }}
           />
         )}
@@ -223,8 +255,43 @@ export default function AdminDashboard() {
       <Toast
         message={toast}
         onClose={() => setToast(null)}
-        type={toast?.toLowerCase().includes("approved") || toast?.toLowerCase().includes("rejected") ? "success" : "error"}
+        type={toast?.toLowerCase().includes("approved") || toast?.toLowerCase().includes("verified") ? "success" : "error"}
       />
+
+      {/* Reason Modal for Unverify */}
+      {reasonModalUser && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setReasonModalUser(null); setReasonText(""); }} />
+          <div className="relative w-full max-w-lg bg-background border border-border/70 rounded-2xl shadow-2xl p-6 space-y-4">
+            <h3 className="text-lg font-semibold">Add a reason to unverify</h3>
+            <p className="text-sm text-foreground/60">This reason will be included in the email to the user.</p>
+            {reasonModalUser?.email && (
+              <p className="text-xs font-mono text-foreground/50">{reasonModalUser.email}</p>
+            )}
+            <textarea
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
+              className="w-full h-28 rounded-xl border border-border/80 bg-background px-3 py-2 text-sm focus:outline-none focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/10"
+              placeholder="Provide a clear, concise reason..."
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setReasonModalUser(null); setReasonText(""); }}
+                className="px-4 py-2 rounded-lg border border-border text-sm hover:bg-foreground/5"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!reasonText.trim()}
+                onClick={() => handleUnverify(reasonModalUser._id, reasonText.trim())}
+                className="px-4 py-2 rounded-lg text-sm text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm & Notify
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

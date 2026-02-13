@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../api/axios";
 import { Briefcase, Calendar, Info, X, ChevronRight , CheckCircle2} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,8 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
   const [sending, setSending] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [occupiedSlots, setOccupiedSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [questionnaire, setQuestionnaire] = useState({
     reason: "",
@@ -19,6 +21,29 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
   });
 
   const [fieldErrors, setFieldErrors] = useState({});
+
+  useEffect(() => {
+    const fetchOccupied = async () => {
+      try {
+        setLoadingSlots(true);
+        const { data } = await api.get(`/requests/mentor/${mentor._id}/occupied-slots`);
+        setOccupiedSlots(data || []);
+      } catch (err) {
+        console.error("Failed to load occupied slots", err);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    if (mentor?._id) {
+      fetchOccupied();
+    }
+  }, [mentor?._id]);
+
+  const isSlotOccupied = (slot) =>
+    occupiedSlots.some(
+      (s) => s.day === slot.day && s.from === slot.from && s.to === slot.to
+    );
 
   const validate = () => {
     const errors = {};
@@ -139,15 +164,20 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
     {mentor.availability?.length > 0 ? (
       mentor.availability.map((slot, i) => {
         const isSelected = JSON.stringify(selectedSlot) === JSON.stringify(slot);
+        const occupied = isSlotOccupied(slot);
         return (
           <div
             key={i}
-            onClick={() => setSelectedSlot(slot)}
+            onClick={() => {
+              if (!occupied) setSelectedSlot(slot);
+            }}
             className={`
               relative group cursor-pointer p-3 rounded-xl border transition-all duration-200
-              ${isSelected 
-                ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.1)]" 
-                : "bg-foreground/[0.03] border-border/50 hover:border-foreground/20 hover:bg-foreground/[0.05]"}
+              ${occupied
+                ? "bg-foreground/[0.02] border-border/30 opacity-60 cursor-not-allowed"
+                : isSelected 
+                  ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.1)]" 
+                  : "bg-foreground/[0.03] border-border/50 hover:border-foreground/20 hover:bg-foreground/[0.05]"}
             `}
           >
             <div className="flex items-center justify-between">
@@ -159,12 +189,16 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
                   {slot.from} – {slot.to}
                 </span>
               </div>
-              
-              {isSelected && (
+
+              {occupied ? (
+                <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 text-[10px] font-bold uppercase tracking-widest border border-rose-500/20">
+                  Occupied
+                </span>
+              ) : isSelected ? (
                 <motion.div layoutId="activeCheck" className="h-5 w-5 rounded-full bg-cyan-500 flex items-center justify-center">
                   <CheckCircle2 size={10} className="text-white" />
                 </motion.div>
-              )}
+              ) : null}
             </div>
           </div>
         );
@@ -178,7 +212,7 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
               <div className="flex justify-end pt-4">
                 <button
                   onClick={() => setShowQuestionnaire(true)}
-                  disabled={!selectedSlot || disabledGlobal || disabledMentor}
+                  disabled={!selectedSlot || disabledGlobal || disabledMentor || isSlotOccupied(selectedSlot)}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background text-xs font-bold uppercase tracking-widest hover:bg-cyan-500 hover:text-white disabled:opacity-20 transition-all shadow-xl shadow-black/10 active:scale-95"
                 >
                   Configure Request <ChevronRight size={14} />

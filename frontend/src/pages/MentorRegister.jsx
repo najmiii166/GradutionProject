@@ -258,6 +258,9 @@ export default function MentorRegister() {
                   <Button onClick={handleStep1Submit} disabled={!isStep1Valid} loading={checkingEmail} variant="primary" className="w-full group">
                     Continue <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
+                  <p className="text-center text-xs text-muted-foreground mt-2">
+                    Already registered? <button type="button" onClick={() => navigate("/login")} className="text-primary font-semibold hover:underline">Sign In</button>
+                  </p>
                 </motion.div>
               )}
 

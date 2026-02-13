@@ -14,6 +14,8 @@
   import MentorDashboard from "./pages/MentorDashboard";
   import MentorSessions from "./pages/MentorSessions";
   import MentorStudents from "./pages/MentorStudents";
+  import MentorRequestsPage from "./pages/MentorRequestsPage";
+  import MentorUpcomingPage from "./pages/MentorUpcomingPage";
   import Support from "./pages/Support";
   import Contact from "./pages/Contact";
   import AdminTickets from "./pages/admin/AdminTickets";
@@ -67,6 +69,8 @@
                   <MentorDashboard />
               }
             />
+            <Route path="/mentor/requests" element={<MentorRequestsPage />} />
+            <Route path="/mentor/upcoming" element={<MentorUpcomingPage />} />
             <Route path="/mentor/sessions" element={<MentorSessions />} />
             <Route path="/mentor/students" element={<MentorStudents />} />
             <Route path="/support" element={<Support />} />

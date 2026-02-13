@@ -106,6 +106,17 @@ const RequestSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+
+  // 🔹 Follow-up linkage (optional)
+  parentSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Request",
+  },
+
+  isFollowUp: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 export default mongoose.model("Request", RequestSchema);
