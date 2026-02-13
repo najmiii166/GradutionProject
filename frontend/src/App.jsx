@@ -17,6 +17,7 @@
   import MentorRequestsPage from "./pages/MentorRequestsPage";
   import MentorUpcomingPage from "./pages/MentorUpcomingPage";
   import Support from "./pages/Support";
+  import Contact from "./pages/Contact";
   import AdminTickets from "./pages/admin/AdminTickets";
 
   import AllMentors from "./pages/AllMentors";
@@ -28,6 +29,7 @@
   // import ReportGenerate from "./pages/ReportGenerate";
   import ReportView from "./pages/ReportView";
   import HistoryPage from "./pages/HistoryPage";
+  import About from "./pages/About";
   
 
 
@@ -72,6 +74,7 @@
             <Route path="/mentor/sessions" element={<MentorSessions />} />
             <Route path="/mentor/students" element={<MentorStudents />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/contact" element={<Contact />} />
 
             {/* Mentor list */}
             <Route path="/mentors" element={<AllMentors />} />
@@ -97,6 +100,9 @@
 
             {/* History */}
             <Route path="/history" element={<HistoryPage />} />
+
+            {/* About */}
+            <Route path="/about" element={<About />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />

@@ -1,5 +1,6 @@
 // src/components/mentor/MentorNavbar.jsx
 import { Bell } from "lucide-react";
+import ThemeToggle from "../ThemeToggle";
 import MentorNotifications from "./MentorNotifications";
 import { getInitials } from "../../utils/mentor";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,6 +52,8 @@ export default function MentorNavbar({
 
         {/* Action Pill Container */}
         <div className="flex items-center gap-3 bg-sidebar/90 border border-border/40 p-1.5 rounded-2xl shadow">
+          <ThemeToggle className="hidden sm:inline-flex" />
+          <div className="w-[1px] h-6 bg-border/50" />
         
         {/* Notifications Trigger */}
         <div className="relative flex items-center justify-center">
@@ -121,7 +124,7 @@ export default function MentorNavbar({
             {getInitials(fullName)}
           </div>
         </button>
-      </div>
+        </div>
       </div>
     </nav>
   );

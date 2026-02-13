@@ -6,9 +6,25 @@ import MentorProfile from "../models/MentorProfile.js";
 import User from "../models/User.js";
 import StudentProfile from "../models/StudentProfile.js";
 import { finalizeSession } from "../utils/finalizeSession.js";
+import { generateRequestDraft } from "../services/aiDraft.service.js";
 
 
 const router = express.Router();
+
+// Simple per-user rate limiter for AI draft generation
+const aiDraftRate = new Map();
+function checkRateLimit(userId, limit = 5, windowMs = 60 * 1000) {
+  const now = Date.now();
+  const rec = aiDraftRate.get(userId) || { count: 0, start: now };
+  if (now - rec.start > windowMs) {
+    // reset window
+    rec.count = 0;
+    rec.start = now;
+  }
+  rec.count += 1;
+  aiDraftRate.set(userId, rec);
+  return rec.count <= limit;
+}
 
 // Helper: strict join window (UTC via ISO Date parsing)
 function computeCanJoin(startTime, endTime, minutesBefore = 5) {
@@ -84,11 +100,11 @@ router.post("/", auth, async (req, res) => {
       status: { $in: ["pending", "upcoming", "ongoing"] },
     }).sort({ requestedAt: -1 });
 
-    if (activeExisting) {
+    if (exists) {
       return res.status(409).json({
         success: false,
         message: "You already have an active request with this mentor.",
-        data: { existingRequestId: activeExisting._id, status: activeExisting.status },
+        data: { existingRequestId: exists._id, status: exists.status },
       });
     }
 
@@ -548,6 +564,84 @@ router.patch("/mentor/:id/meeting-link", auth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to save meeting link" });
+  }
+});
+
+/* ============================
+   AI: GENERATE REQUEST DRAFT
+============================ */
+router.post("/ai/draft", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Only students can use AI draft." });
+    }
+
+    // rate limit per user
+    const ok = checkRateLimit(req.user.id, 5, 60 * 1000);
+    if (!ok) {
+      return res.status(429).json({ message: "You're asking too fast, please wait." });
+    }
+
+    const { mentorId, slot, objectives, proficiency, language, notes } = req.body || {};
+
+    // validate input
+    if (!mentorId || typeof mentorId !== "string") {
+      return res.status(400).json({ message: "mentorId is required." });
+    }
+    const day = slot?.day; const from = slot?.from; const to = slot?.to;
+    if (!slot || !day || !from || !to) {
+      return res.status(400).json({ message: "slot requires day, from, to." });
+    }
+
+    const allowedObjectives = [
+      "career_development",
+      "interview_preparation",
+      "skill_improvement",
+      "project_development",
+    ];
+    const cleanObjectives = Array.isArray(objectives)
+      ? objectives.filter((o) => allowedObjectives.includes(o))
+      : [];
+
+    const allowedProficiency = ["beginner", "intermediate", "advanced"];
+    if (!allowedProficiency.includes(proficiency)) {
+      return res.status(400).json({ message: "Invalid proficiency." });
+    }
+
+    const lang = language === "so" ? "so" : "en";
+
+    // Optionally fetch mentor public info (kept safe)
+    let mentorPublic = null;
+    try {
+      mentorPublic = await MentorProfile.findById(mentorId)
+        .select("expertiseAreas institution")
+        .lean();
+    } catch {}
+
+    // Generate draft (Gemini if configured, else safe fallback)
+    const draft = await generateRequestDraft({
+      mentorPublic,
+      slot: { day, from, to },
+      objectives: cleanObjectives,
+      proficiency,
+      language: lang,
+      notes: typeof notes === "string" ? notes : "",
+    });
+
+    // Strict JSON only
+    return res.json(draft);
+  } catch (err) {
+    console.error("AI DRAFT ERROR:", err);
+    // Return safe fallback JSON if something unexpected happens
+    return res.status(200).json({
+      motivationStatement: "I’m seeking mentorship to improve my skills and achieve clear outcomes aligned with my current proficiency.",
+      sessionGoal: "Define a practical pathway for the selected objectives and set measurable targets for the next session.",
+      goals: ["skill_improvement"],
+      suggestedQuestions: [
+        "Which foundational topics should I prioritize?",
+        "What realistic outcomes can we target in this session?",
+      ],
+    });
   }
 });
 

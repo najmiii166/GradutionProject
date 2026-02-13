@@ -46,9 +46,12 @@ export default function MentorQuestionnaire({
     <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
       {/* Motivation Field */}
       <div className="space-y-2">
-        <label className="text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
-          Motivation Statement
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">
+            Motivation Statement
+          </label>
+            <div />
+        </div>
         <textarea
           className={`w-full p-4 rounded-xl bg-foreground/[0.03] border text-sm transition-all focus:ring-0 placeholder:text-foreground/20 min-h-[100px] resize-none
             ${fieldErrors.reason ? "border-rose-500/40" : "border-border/50 focus:border-cyan-500/50"}`}

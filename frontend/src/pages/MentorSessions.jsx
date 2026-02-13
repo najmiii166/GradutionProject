@@ -26,12 +26,16 @@ export default function MentorSessions() {
   })();}, []);
 
   return (
-    <div className="p-6 min-h-screen bg-slate-950 text-white">
+    <div className="p-6 min-h-screen bg-background text-foreground">
       <h2 className="text-2xl font-semibold mb-4">My Sessions</h2>
-      {loading ? <div>Loading...</div> : (
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
         <div>
-          {sessions.length === 0 && <div className="text-slate-400">No sessions found.</div>}
-          {sessions.map(s => (
+          {sessions.length === 0 && (
+            <div className="text-slate-400">No sessions found.</div>
+          )}
+          {sessions.map((s) => (
             <SessionCard key={s._id} session={s} />
           ))}
         </div>

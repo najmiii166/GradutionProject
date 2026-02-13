@@ -1,6 +1,7 @@
 // src/components/student/StudentNavbar.jsx
 import { useEffect, useRef, useState } from "react";
 import { Mail } from "lucide-react";
+import ThemeToggle from "../ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { getInitials } from "../../utils/student";
 import { motion, AnimatePresence } from "framer-motion";
@@ -66,6 +67,8 @@ export default function StudentNavbar({
 
         {/* Actions */}
         <div className="flex items-center gap-3 bg-sidebar/90 border border-border/40 p-1.5 rounded-2xl shadow">
+          <ThemeToggle className="hidden sm:inline-flex" />
+          <div className="w-[1px] h-6 bg-border/50" />
         
         <div className="relative flex items-center justify-center">
           <button
