@@ -2,6 +2,7 @@ import { useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GetStartedModal from "../components/GetStartedModal";
+import FloatingThemeToggle from "../components/FloatingThemeToggle";
 import AboutSection from "../sections/AboutSection";
 
 export default function About() {
@@ -10,6 +11,7 @@ export default function About() {
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
       <Navbar onOpenJoin={() => setShowModal(true)} />
+      <FloatingThemeToggle />
       <main className="pt-24">
         <AboutSection />
       </main>

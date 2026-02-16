@@ -100,11 +100,11 @@ router.post("/", auth, async (req, res) => {
       status: { $in: ["pending", "upcoming", "ongoing"] },
     }).sort({ requestedAt: -1 });
 
-    if (exists) {
+    if (activeExisting) {
       return res.status(409).json({
         success: false,
         message: "You already have an active request with this mentor.",
-        data: { existingRequestId: exists._id, status: exists.status },
+        data: { existingRequestId: activeExisting._id, status: activeExisting.status },
       });
     }
 

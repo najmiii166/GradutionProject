@@ -2,6 +2,7 @@ import { useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GetStartedModal from "../components/GetStartedModal";
+import FloatingThemeToggle from "../components/FloatingThemeToggle";
 import ContactSection from "../sections/ContactSection";
 
 export default function Contact() {
@@ -10,6 +11,7 @@ export default function Contact() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
       <Navbar onOpenJoin={() => setShowModal(true)} />
+      <FloatingThemeToggle />
       <main className="pt-24">
         <ContactSection />
       </main>
