@@ -5,6 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import MentorQuestionnaire from "./MentorQuestionnaire";
 import { universities } from "../constants/systemData";
 
+const formatTime12h = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return raw;
+  const hour24 = Number(match[1]);
+  const minute = match[2];
+  if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return raw;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${minute} ${period}`;
+};
+
 export default function MentorModal({ mentor, onClose, onRequestSent, disabledGlobal = false, disabledMentor = false }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [sending, setSending] = useState(false);
@@ -186,7 +198,7 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
                   {slot.day}
                 </span>
                 <span className="text-[11px] text-foreground/40 font-medium">
-                  {slot.from} – {slot.to}
+                  {formatTime12h(slot.from)} – {formatTime12h(slot.to)}
                 </span>
               </div>
 

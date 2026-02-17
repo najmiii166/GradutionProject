@@ -1,5 +1,5 @@
 // src/pages/ChatScreen.jsx
-import { useEffect, useRef, useState, useContext, useMemo } from "react";
+import { useEffect, useRef, useState, useContext, useMemo, useLayoutEffect } from "react";
 import { api, setAuthToken } from "../api/axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { SocketContext } from "../Contexts/SocketContext";
@@ -29,9 +29,27 @@ export default function ChatScreen() {
   const navigate = useNavigate();
   const { id: routeConversationId } = useParams();
 
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const readScopedAuth = (key) => {
+    const fromSession = sessionStorage.getItem(key);
+    if (fromSession) return fromSession;
+    return localStorage.getItem(key);
+  };
+
+  const token = readScopedAuth("token");
+  const role = readScopedAuth("role");
+  const user = JSON.parse(readScopedAuth("user") || "{}");
+  const conversationsCacheKey = `chat:conversations:${role || "unknown"}:${user?._id || "unknown"}`;
+  const initialConversationsCache = (() => {
+    try {
+      const raw = sessionStorage.getItem(conversationsCacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  })();
+  const hasInitialConversationsCache = initialConversationsCache !== null;
 
   // Handle auth and axios token setup in an effect,
   // so we don't perform navigation or side effects during render.
@@ -54,7 +72,7 @@ export default function ChatScreen() {
   // -----------------------------------------
   // STATE
   // -----------------------------------------
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState(initialConversationsCache || []);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [activePartnerName, setActivePartnerName] = useState("");
   const [activePartnerId, setActivePartnerId] = useState(null);
@@ -70,7 +88,7 @@ export default function ChatScreen() {
   const [query, setQuery] = useState("");
   const [text, setText] = useState("");
 
-  const [loadingConvos, setLoadingConvos] = useState(true);
+  const [loadingConvos, setLoadingConvos] = useState(!hasInitialConversationsCache);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
 
   const [theirTyping, setTheirTyping] = useState(false);
@@ -80,12 +98,17 @@ export default function ChatScreen() {
   const [toast, setToast] = useState(null);
 
   const messagesRef = useRef(null);
+  const inputRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const messageRefs = useRef({});
+  const chunksRef = useRef([]);
 
   const [selectedMessageId, setSelectedMessageId] = useState(null);
   const [showEmojiFor, setShowEmojiFor] = useState(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const [replyTarget, setReplyTarget] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
@@ -96,6 +119,36 @@ export default function ChatScreen() {
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const lastTypingRef = useRef(0);
+  const highlightTimerRef = useRef(null);
+
+  const uniqueByMessageId = (list) => {
+    const seen = new Set();
+    const out = [];
+    for (const msg of list || []) {
+      const id = String(msg?._id || "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(msg);
+    }
+    return out;
+  };
+
+  const getSenderId = (msg) => String(msg?.sender?._id || msg?.sender || "");
+  const isOwnMessage = (msg) => getSenderId(msg) === String(user._id || "");
+
+  const touchConversationPreview = (conversationId, previewText, timeValue = new Date().toISOString()) => {
+    setConversations((prev) => {
+      const next = prev.map((conversation) =>
+        String(conversation._id) === String(conversationId)
+          ? { ...conversation, lastMessage: previewText, lastMessageAt: timeValue }
+          : conversation
+      );
+      next.sort(
+        (a, b) => new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime()
+      );
+      return next;
+    });
+  };
 
   // Sync active conversation with global socket context
   useEffect(() => {
@@ -111,13 +164,32 @@ export default function ChatScreen() {
 
   const apiBase = (api?.defaults?.baseURL || "").replace(/\/$/, "");
   const serverOrigin = apiBase.replace(/\/api$/i, "");
+  const attachmentToken = token ? encodeURIComponent(token) : "";
+
+  const getAttachmentUrl = (msg) => {
+    if (!msg?.fileUrl) return "";
+    if (!attachmentToken) return `${serverOrigin}${msg.fileUrl}`;
+    const sep = msg.fileUrl.includes("?") ? "&" : "?";
+    return `${serverOrigin}${msg.fileUrl}${sep}token=${attachmentToken}`;
+  };
+
+  const attachmentMime = attachment?.file?.type || attachment?.type || "";
+  const isAudioAttachment = attachmentMime.startsWith("audio/");
+  const isImageAttachment = attachmentMime.startsWith("image/");
+  const attachmentName = attachment?.file?.name || attachment?.name || "Attachment";
 
   // -----------------------------------------
   // CORE LOGIC (UNTOUCHED)
   // -----------------------------------------
   useEffect(() => {
+    try {
+      sessionStorage.setItem(conversationsCacheKey, JSON.stringify(conversations || []));
+    } catch {}
+  }, [conversations, conversationsCacheKey]);
+
+  useEffect(() => {
     const load = async () => {
-      setLoadingConvos(true);
+      if (!hasInitialConversationsCache) setLoadingConvos(true);
       try {
         const url = role === "student" ? "/chat/student" : "/chat/mentor";
         const { data } = await api.get(url);
@@ -131,36 +203,42 @@ export default function ChatScreen() {
       finally { setLoadingConvos(false); }
     };
     load();
-  }, [routeConversationId, role]);
+  }, [routeConversationId, role, hasInitialConversationsCache]);
 
   useEffect(() => {
     if (!activeConversationId) return;
-    
-    // Sync with global context for unread tracking
-    if (setGlobalActiveId) setGlobalActiveId(activeConversationId);
-    if (markAsRead) markAsRead(activeConversationId);
 
     const conv = conversations.find((c) => c._id === activeConversationId);
     if (conv) {
       setActivePartnerName(role === "student" ? conv.mentorName : conv.studentName);
-      setActivePartnerId(role === "student" 
-        ? conv.mentorId || conv.mentor?._id 
-        : conv.studentId || conv.student?._id
+      setActivePartnerId(
+        role === "student" ? conv.mentorId || conv.mentor?._id : conv.studentId || conv.student?._id
       );
     }
+  }, [activeConversationId, conversations, role]);
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    // Sync with global context for unread tracking
+    if (setGlobalActiveId) setGlobalActiveId(activeConversationId);
+    if (markAsRead) markAsRead(activeConversationId);
 
     const loadMsgs = async () => {
       setLoadingMsgs(true);
       try {
         const { data } = await api.get(`/chat/${activeConversationId}/messages`);
-        setMessages(data || []);
+        setMessages(uniqueByMessageId(data || []));
         // Mark last message seen logic...
         const last = data[data.length - 1];
-        if (last && last.sender !== user._id && socket) {
+        if (last && getSenderId(last) !== String(user._id) && socket) {
           socket.emit("seen", { conversationId: activeConversationId, messageId: last._id });
         }
-      } catch { setToast("Failed to load messages"); }
-      finally { setLoadingMsgs(false); }
+      } catch {
+        setToast("Failed to load messages");
+      } finally {
+        setLoadingMsgs(false);
+      }
     };
     loadMsgs();
 
@@ -168,7 +246,7 @@ export default function ChatScreen() {
       // Clear global active ID when leaving chat
       if (setGlobalActiveId) setGlobalActiveId(null);
     };
-  }, [activeConversationId, conversations, role, user._id, socket, setGlobalActiveId, markAsRead]);
+  }, [activeConversationId, user._id, socket, setGlobalActiveId, markAsRead]);
 
   useEffect(() => {
     if (!socket || !activeConversationId) return;
@@ -177,14 +255,26 @@ export default function ChatScreen() {
     socket.emit("join_conversation", { conversationId: activeConversationId });
 
     socket.on("new_message", (msg) => {
+      touchConversationPreview(
+        msg?.conversationId,
+        msg?.text || msg?.fileName || (msg?.type === "audio" ? "Voice message" : "Attachment"),
+        msg?.createdAt || new Date().toISOString()
+      );
+
       setMessages((prev) => {
+        const incomingSenderId = getSenderId(msg);
+        const myId = String(user._id || "");
+
+        // Prevent duplicates for own sends (optimistic + API reconciliation already handles local state)
+        if (incomingSenderId === myId) return prev;
+
         if (String(msg.conversationId) === String(activeConversationId)) {
           if (prev.some((m) => String(m._id) === String(msg._id))) return prev;
-          return [...prev, msg];
+          return uniqueByMessageId([...prev, msg]);
         }
         return prev;
       });
-      if (msg.sender !== user._id && String(msg.conversationId) === String(activeConversationId)) {
+      if (getSenderId(msg) !== String(user._id) && String(msg.conversationId) === String(activeConversationId)) {
         socket.emit("seen", { conversationId: activeConversationId, messageId: msg._id });
       }
     });
@@ -196,7 +286,10 @@ export default function ChatScreen() {
       }
     });
 
-    socket.on("seen", (data) => setSeenData((prev) => ({ ...prev, [data.messageId]: true })));
+    socket.on("seen", (data) => {
+      if (String(data?.seenBy || "") === String(user._id)) return;
+      setSeenData((prev) => ({ ...prev, [data.messageId]: true }));
+    });
     socket.on("user_status", (data) => {
       if (String(data.userId) === String(activePartnerId)) setTheirStatus(data.status);
     });
@@ -209,16 +302,50 @@ export default function ChatScreen() {
     socket.on("message:react", (msg) => {
       setMessages((prev) => prev.map((m) => String(m._id) === String(msg._id) ? { ...m, reactions: msg.reactions } : m));
     });
+    socket.on("message:delivered", (payload) => {
+      if (String(payload?.conversationId) !== String(activeConversationId)) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m._id) === String(payload?.messageId) ? { ...m, status: "delivered" } : m
+        )
+      );
+    });
 
     return () => {
       socket.off("new_message"); socket.off("typing"); socket.off("seen");
       socket.off("user_status"); socket.off("message:updated");
-      socket.off("message:deleted"); socket.off("message:react");
+      socket.off("message:deleted"); socket.off("message:react"); socket.off("message:delivered");
     };
   }, [socket, activeConversationId, activePartnerId, user._id]);
 
   const sendMessage = async () => {
-    if (!text.trim() && !attachment) return;
+    const trimmedText = text.trim();
+
+    if (editingMessageId) {
+      if (!trimmedText) {
+        setToast("Message cannot be empty");
+        return;
+      }
+
+      socket?.emit("message:edit", {
+        conversationId: activeConversationId,
+        messageId: editingMessageId,
+        text: trimmedText,
+      });
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m._id) === String(editingMessageId)
+            ? { ...m, text: trimmedText, edited: true }
+            : m
+        )
+      );
+      setEditingMessageId(null);
+      setText("");
+      return;
+    }
+
+    if (!trimmedText && !attachment) return;
 
     // OPTIMISTIC UPDATE
     const tempId = "temp-" + Date.now();
@@ -230,7 +357,17 @@ export default function ChatScreen() {
       status: "pending",
       conversationId: activeConversationId,
       fileUrl: attachmentPreview && !attachment.file ? attachmentPreview : null, 
-      type: attachment ? (attachment.file?.type.startsWith('image') ? 'image' : 'file') : 'text'
+      type: attachment ? (attachment.file?.type.startsWith('image') ? 'image' : 'file') : 'text',
+      replyTo: replyTarget
+        ? {
+            _id: replyTarget._id,
+            text: replyTarget.text,
+            deleted: replyTarget.deleted,
+            sender: replyTarget.sender,
+            fileName: replyTarget.fileName,
+            type: replyTarget.type,
+          }
+        : null,
     };
 
     setMessages((prev) => [...prev, tempMsg]);
@@ -246,15 +383,25 @@ export default function ChatScreen() {
         if (attachment.duration) form.append("duration", attachment.duration);
       }
       if (tempMsg.text.trim()) form.append("text", tempMsg.text);
+      if (replyTarget?._id) form.append("replyTo", replyTarget._id);
       
       const { data } = await api.post(`/chat/${activeConversationId}/messages`, form, {
         headers: { "Content-Type": "multipart/form-data" }
       });
 
-      // RECONCILIATION
-      setMessages((prev) => 
-        prev.map((m) => (m._id === tempId ? { ...data, status: "sent" } : m))
+      touchConversationPreview(
+        activeConversationId,
+        data?.text || data?.fileName || (data?.type === "audio" ? "Voice message" : "Attachment"),
+        data?.createdAt || new Date().toISOString()
       );
+
+      // RECONCILIATION
+      setMessages((prev) =>
+        uniqueByMessageId(
+          prev.map((m) => (m._id === tempId ? { ...data, status: "sent" } : m))
+        )
+      );
+      setReplyTarget(null);
     } catch (err) {
       setToast("Message transmission failed");
       setMessages((prev) => 
@@ -274,8 +421,52 @@ export default function ChatScreen() {
     }
   };
 
+  const handleReply = (message) => {
+    if (!message) return;
+    setReplyTarget(message);
+    setSelectedMessageId(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const getReplyTargetId = (msg) => String(msg?.replyTo?._id || msg?.replyTo || "");
+
+  const getReplyPreviewText = (msg) => {
+    const reply = msg?.replyTo;
+    if (!reply) return "Original message";
+    if (typeof reply === "string") return "Original message";
+    if (reply.deleted) return "Message deleted";
+    if (reply.text?.trim()) return reply.text;
+    if (reply.type === "audio") return "Voice message";
+    if (reply.fileName) return reply.fileName;
+    return "Attachment";
+  };
+
+  const jumpToMessage = (messageId) => {
+    const targetId = String(messageId || "");
+    if (!targetId) return;
+
+    const targetEl = messageRefs.current[targetId];
+    if (!targetEl) {
+      setToast("Original message not found in this chat view");
+      return;
+    }
+
+    targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedMessageId(targetId);
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 1800);
+  };
+
   async function startRecording() {
     try {
+      // Starting a new recording replaces any staged attachment preview.
+      setAttachment(null);
+      setAttachmentPreview(null);
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -305,18 +496,38 @@ export default function ChatScreen() {
   }
 
   const handleEdit = (m) => {
-    const newText = prompt("Edit message:", m.text);
-    if (newText != null && newText !== m.text) socket.emit("message:edit", { messageId: m._id, text: newText });
+    if (!m || m.deleted || !isOwnMessage(m)) {
+      setSelectedMessageId(null);
+      return;
+    }
+
+    if (!(m.text || "").trim()) {
+      setToast("Only text messages can be edited");
+      setSelectedMessageId(null);
+      return;
+    }
+
+    setEditingMessageId(m._id);
+    setText(m.text || "");
+    setReplyTarget(null);
+    setAttachment(null);
+    setAttachmentPreview(null);
     setSelectedMessageId(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleDelete = (m) => {
-    if (confirm("Delete for everyone?")) socket.emit("message:delete", { messageId: m._id });
+    if (!m || m.deleted || !isOwnMessage(m)) {
+      setSelectedMessageId(null);
+      return;
+    }
+
+    setDeleteConfirmMessage(m);
     setSelectedMessageId(null);
   };
 
   const handleReact = (id, emoji) => {
-    socket.emit("message:react", { messageId: id, emoji });
+    socket.emit("message:react", { conversationId: activeConversationId, messageId: id, emoji });
     setShowEmojiFor(null);
     setSelectedMessageId(null);
   };
@@ -347,6 +558,45 @@ export default function ChatScreen() {
     });
     return groups;
   }, [messages]);
+
+  const selectedMessage = useMemo(
+    () => messages.find((m) => String(m._id) === String(selectedMessageId)) || null,
+    [messages, selectedMessageId]
+  );
+
+  const editingMessage = useMemo(
+    () => messages.find((m) => String(m._id) === String(editingMessageId)) || null,
+    [messages, editingMessageId]
+  );
+
+  const canManageSelectedMessage = !!selectedMessage && isOwnMessage(selectedMessage);
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+    setEditingMessageId(null);
+    setDeleteConfirmMessage(null);
+  }, [activeConversationId]);
+
+  const scrollToBottom = (behavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  };
+
+  useLayoutEffect(() => {
+    if (!activeConversationId || loadingMsgs) return;
+    scrollToBottom("auto");
+    const frame = requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => cancelAnimationFrame(frame);
+  }, [activeConversationId, loadingMsgs]);
+
+  useEffect(() => {
+    scrollToBottom("smooth");
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
 
   // -----------------------------------------
   // RENDER (Dossier Theme Update)
@@ -524,22 +774,30 @@ export default function ChatScreen() {
                       >
                         {/* REPLY THREAD */}
                         {m.replyTo && (
-                          <div className={`mb-2 p-2 rounded-lg text-[10px] border-l-2 ${isMe ? "bg-black/10 border-white/40" : "bg-foreground/5 border-cyan-500/40"}`}>
-                            {m.replyTo.text?.slice(0, 50) || "Data Packet"}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              jumpToMessage(getReplyTargetId(m));
+                            }}
+                            className={`mb-2 w-full text-left p-2 rounded-lg text-[10px] border-l-2 hover:opacity-90 transition-opacity ${isMe ? "bg-black/10 border-white/40" : "bg-foreground/5 border-cyan-500/40"}`}
+                          >
+                            <span className="block opacity-70 uppercase tracking-widest text-[8px]">Replying to</span>
+                            <span className="block truncate">{getReplyPreviewText(m)}</span>
+                          </button>
                         )}
 
                         {/* PACKET CONTENT */}
                         {m.fileUrl && (
                           <div className="mb-2 overflow-hidden rounded-lg">
                             {m.type === "image" && (
-                              <img src={`${serverOrigin}${m.fileUrl}`} className="max-w-full h-auto hover:scale-105 transition-transform" alt="Packet" />
+                              <img src={getAttachmentUrl(m)} className="max-w-full h-auto hover:scale-105 transition-transform" alt="Packet" />
                             )}
                             {m.type === "audio" && (
-                              <audio controls src={`${serverOrigin}${m.fileUrl}`} className="w-48 h-8 opacity-80 filter invert" />
+                              <audio controls src={getAttachmentUrl(m)} className="w-48 h-8 opacity-80 filter invert" />
                             )}
                             {m.type === "file" && (
-                              <a href={`${serverOrigin}${m.fileUrl}`} download className="flex items-center gap-2 p-3 bg-black/20 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-black/40 transition-all">
+                              <a href={getAttachmentUrl(m)} download className="flex items-center gap-2 p-3 bg-black/20 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-black/40 transition-all">
                                 <Paperclip size={14} /> {m.fileName || "Download"}
                               </a>
                             )}
@@ -549,10 +807,10 @@ export default function ChatScreen() {
                         {!m.deleted ? (
                           <p className="whitespace-pre-wrap">
                             {m.text}
-                            {m.edited && <span className="ml-2 text-[8px] uppercase font-black opacity-40">(Modified)</span>}
+                            {m.edited && <span className="ml-2 text-[8px] uppercase font-black opacity-40">(edited)</span>}
                           </p>
                         ) : (
-                          <p className="italic opacity-40 text-[11px] uppercase font-black tracking-widest">Packet Purged</p>
+                          <p className=" opacity-40 text-[11px] uppercase font-semi tracking-widest">Message Deleted</p>
                         )}
 
                         {/* PACKET REACTIONS */}
@@ -574,7 +832,7 @@ export default function ChatScreen() {
                         {isMe && (
                           m.status === "error" ? <span className="text-rose-500"> • FAILED</span> :
                           m.status === "pending" ? <span className="animate-pulse opacity-70"> • SENDING</span> :
-                          (seenData[m._id] ? " • SEEN" : " • SENT")
+                          (seenData[m._id] ? " • SEEN" : (m.status === "delivered" ? " • DELIVERED" : " • SENT"))
                         )}
                       </span>
                     </div>
@@ -582,7 +840,7 @@ export default function ChatScreen() {
                 );
               })
             )}
-            <div ref={messagesRef} />
+            <div ref={messagesEndRef} />
           </div>
 
           {/* TRANSISSION INPUT */}
@@ -601,6 +859,28 @@ export default function ChatScreen() {
               )}
             </AnimatePresence>
 
+            <AnimatePresence>
+              {editingMessage && (
+                <motion.div initial={{y: 10, opacity: 0}} animate={{y: 0, opacity: 1}} exit={{y: 10, opacity: 0}} className="mb-3 flex items-center justify-between bg-foreground/[0.05] border border-cyan-500/20 p-3 rounded-xl backdrop-blur-md">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Edit3 size={14} className="text-cyan-500 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/60 truncate">
+                      Editing: {(editingMessage.text || "").slice(0, 40)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingMessageId(null);
+                      setText("");
+                    }}
+                    className="text-foreground/40 hover:text-rose-500 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="relative flex items-end gap-3 max-w-5xl mx-auto">
               <div className="flex items-center gap-1.5 mb-1">
                 <label className="cursor-pointer p-2.5 rounded-xl bg-foreground/[0.03] border border-border/20 hover:border-cyan-500/40 hover:text-cyan-500 transition-all text-foreground/40">
@@ -609,7 +889,11 @@ export default function ChatScreen() {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     setAttachment(file);
-                    if (file.type.startsWith("image/") || file.type.startsWith("audio/")) setAttachmentPreview(URL.createObjectURL(file));
+                    if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
+                      setAttachmentPreview(URL.createObjectURL(file));
+                    } else {
+                      setAttachmentPreview(null);
+                    }
                   }} />
                 </label>
                 
@@ -623,15 +907,25 @@ export default function ChatScreen() {
               </div>
 
               <div className="flex-1 relative">
-                {attachmentPreview && (
+                {(attachmentPreview || attachment) && (
                   <div className="absolute bottom-full left-0 mb-3 p-2 bg-foreground/10 backdrop-blur-md rounded-xl border border-border/40">
                     <button onClick={() => {setAttachment(null); setAttachmentPreview(null)}} className="absolute -top-2 -right-2 p-1 bg-rose-500 text-white rounded-full shadow-lg"><X size={10}/></button>
-                    {attachment?.type?.startsWith("audio/") ? <audio src={attachmentPreview} controls className="h-8 w-32" /> : <img src={attachmentPreview} className="h-20 w-20 object-cover rounded-lg" alt="preview" />}
+                    {isAudioAttachment && attachmentPreview ? (
+                      <audio src={attachmentPreview} controls className="h-8 w-40" />
+                    ) : isImageAttachment && attachmentPreview ? (
+                      <img src={attachmentPreview} className="h-20 w-20 object-cover rounded-lg" alt="preview" />
+                    ) : (
+                      <div className="flex items-center gap-2 rounded-lg bg-foreground/[0.05] px-3 py-2 text-xs text-foreground/80">
+                        <Paperclip size={14} />
+                        <span className="truncate max-w-[180px]">{attachmentName}</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <textarea
+                  ref={inputRef}
                   className="w-full bg-foreground/[0.03] border border-border/20 rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:border-cyan-500/50 transition-all resize-none max-h-32 placeholder:text-foreground/20"
-                  placeholder="ENCRYPTED TRANSMISSION..."
+                  placeholder={editingMessageId ? "Edit your message..." : "ENCRYPTED TRANSMISSION..."}
                   rows="1"
                   value={text}
                   onChange={handleTyping}
@@ -642,6 +936,7 @@ export default function ChatScreen() {
               <button 
                 onClick={sendMessage}
                 className="mb-1 p-3.5 rounded-2xl bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+                title={editingMessageId ? "Save edit" : "Send message"}
               >
                 <Send size={20} />
               </button>
@@ -669,14 +964,51 @@ export default function ChatScreen() {
                     <button key={emo} onClick={() => handleReact(selectedMessageId, emo)} className="text-2xl hover:scale-125 transition-transform">{emo}</button>
                   ))}
                </div>
-               <button onClick={() => handleReply(messages.find(m => m._id === selectedMessageId))} className="flex items-center gap-3 w-full p-3 hover:bg-cyan-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-cyan-400 transition-colors"><Reply size={16}/> Reply to packet</button>
-               {messages.find(m => m._id === selectedMessageId)?.sender === user._id && (
+               <button onClick={() => handleReply(selectedMessage)} className="flex items-center gap-3 w-full p-3 hover:bg-cyan-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-cyan-400 transition-colors"><Reply size={16}/> Reply to message</button>
+               {canManageSelectedMessage && (
                  <>
-                  <button onClick={() => handleEdit(messages.find(m => m._id === selectedMessageId))} className="flex items-center gap-3 w-full p-3 hover:bg-cyan-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-cyan-400 transition-colors"><Edit3 size={16}/> Edit metadata</button>
-                  <button onClick={() => handleDelete(messages.find(m => m._id === selectedMessageId))} className="flex items-center gap-3 w-full p-3 hover:bg-rose-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-rose-500 transition-colors"><Trash2 size={16}/> Purge node</button>
+                  <button onClick={() => handleEdit(selectedMessage)} className="flex items-center gap-3 w-full p-3 hover:bg-cyan-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-cyan-400 transition-colors"><Edit3 size={16}/> Edit message</button>
+                  <button onClick={() => handleDelete(selectedMessage)} className="flex items-center gap-3 w-full p-3 hover:bg-rose-500/10 rounded-xl text-[11px] font-black uppercase tracking-widest text-rose-500 transition-colors"><Trash2 size={16}/> Delete message</button>
                  </>
                )}
-               <button onClick={() => setSelectedMessageId(null)} className="w-full pt-4 text-[9px] font-black uppercase tracking-widest opacity-30">Close System Menu</button>
+               <button onClick={() => setSelectedMessageId(null)} className="w-full pt-4 text-[9px] font-black uppercase tracking-widest opacity-30">Close menu</button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteConfirmMessage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm" onClick={() => setDeleteConfirmMessage(null)}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-foreground/[0.05] border border-border/40 rounded-2xl p-5 backdrop-blur-xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm font-bold text-foreground/90">Delete this message for everyone?</p>
+              <p className="mt-2 text-[11px] text-foreground/50 truncate">{deleteConfirmMessage.text || "This message will be removed."}</p>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setDeleteConfirmMessage(null)}
+                  className="px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider border border-border/30 text-foreground/60 hover:bg-foreground/[0.04]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    socket?.emit("message:delete", {
+                      conversationId: activeConversationId,
+                      messageId: deleteConfirmMessage._id,
+                    });
+                    setDeleteConfirmMessage(null);
+                  }}
+                  className="px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-rose-500/90 text-white hover:bg-rose-500"
+                >
+                  Delete
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

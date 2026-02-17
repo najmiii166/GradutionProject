@@ -47,7 +47,17 @@ const chatStorage = multer.diskStorage({
   },
 });
 
+const chatFileFilter = (req, file, cb) => {
+  const mime = String(file.mimetype || "").toLowerCase();
+  const isImage = mime.startsWith("image/");
+  const isAudioWebm = mime === "audio/webm";
+  const isPdf = mime === "application/pdf";
+  const ok = isImage || isAudioWebm || isPdf;
+  cb(ok ? null : new Error("Only image/*, audio/webm, and PDF files are allowed"), ok);
+};
+
 export const uploadChatAttachment = multer({
   storage: chatStorage,
+  fileFilter: chatFileFilter,
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
 });

@@ -9,6 +9,31 @@ import { Search, RefreshCcw, ArrowLeft, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import StudentSidebar from "../components/student/StudentSidebar";
 
+const DAY_MAP = {
+  mon: "monday",
+  monday: "monday",
+  tue: "tuesday",
+  tues: "tuesday",
+  tuesday: "tuesday",
+  wed: "wednesday",
+  wednesday: "wednesday",
+  thu: "thursday",
+  thur: "thursday",
+  thurs: "thursday",
+  thursday: "thursday",
+  fri: "friday",
+  friday: "friday",
+  sat: "saturday",
+  saturday: "saturday",
+  sun: "sunday",
+  sunday: "sunday",
+};
+
+const normalizeDay = (value) => {
+  const key = String(value || "").trim().toLowerCase();
+  return DAY_MAP[key] || key;
+};
+
 export default function AllMentors() {
   const token = localStorage.getItem("token");
   setAuthToken(token);
@@ -63,7 +88,10 @@ export default function AllMentors() {
     const exp = parseInt(m.yearsOfExperience, 10) || 0;
     const matchesSearch = m.user.fullName.toLowerCase().includes(search.toLowerCase());
     const matchesUniversity = universityFilter ? m.user.university === universityFilter : true;
-    const matchesDay = dayFilter ? m.availability?.some((slot) => slot.day === dayFilter) : true;
+    const selectedDay = normalizeDay(dayFilter);
+    const matchesDay = !selectedDay
+      ? true
+      : (m.availability || []).some((slot) => normalizeDay(slot?.day) === selectedDay);
     const matchesExperience = experienceFilter ? exp >= parseInt(experienceFilter, 10) : true;
     return matchesSearch && matchesUniversity && matchesDay && matchesExperience;
   });

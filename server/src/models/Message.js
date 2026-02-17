@@ -17,6 +17,12 @@ const messageSchema = new mongoose.Schema(
 
     text: { type: String },
 
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+
     // -----------------------------
     // MESSAGE TYPE
     // -----------------------------
@@ -30,6 +36,10 @@ const messageSchema = new mongoose.Schema(
     // FILE / IMAGE / AUDIO FIELDS
     // -----------------------------
     fileUrl: { type: String },
+    // Server-side stored filename used by authenticated attachment route
+    fileDiskName: { type: String },
+    fileIv: { type: String },
+    fileAuthTag: { type: String },
     fileName: { type: String },
     mimeType: { type: String },
     fileSize: { type: Number },

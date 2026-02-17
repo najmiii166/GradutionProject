@@ -3,6 +3,18 @@ import { motion } from "framer-motion";
 import { Calendar, Sparkles, Briefcase, Star } from "lucide-react";
 import { faculties, universities } from "../constants/systemData";
 
+const formatTime12h = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return raw;
+  const hour24 = Number(match[1]);
+  const minute = match[2];
+  if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return raw;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${minute} ${period}`;
+};
+
 export default function MentorCard({ mentor, onClick, disabled = false }) {
   const name = mentor.user?.fullName || "Unknown Mentor";
   const universityKey = mentor.user?.university || mentor.institution || "";
@@ -79,7 +91,7 @@ export default function MentorCard({ mentor, onClick, disabled = false }) {
           <p className="text-[9px] uppercase tracking-[0.2em] font-bold text-foreground/30">Next Slot</p>
           {availability.length > 0 ? (
             <span className="text-[10px] font-bold text-foreground/70">
-              {availability[0].day}: {availability[0].from}
+              {availability[0].day}: {formatTime12h(availability[0].from)}
             </span>
           ) : (
             <span className="text-[10px] font-bold text-foreground/20 italic">No Slots</span>

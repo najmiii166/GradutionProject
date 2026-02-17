@@ -38,6 +38,13 @@ export default function Login() {
       if (fullName) localStorage.setItem("fullName", fullName);
       if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
+      // Keep per-tab auth snapshot so multiple tabs can use different users safely.
+      sessionStorage.setItem("token", data.token);
+      if (role) sessionStorage.setItem("role", role);
+      if (status) sessionStorage.setItem("status", status);
+      if (fullName) sessionStorage.setItem("fullName", fullName);
+      if (data.user) sessionStorage.setItem("user", JSON.stringify(data.user));
+
       setAuthToken(data.token);
       setToast("Logged in successfully ✨");
 

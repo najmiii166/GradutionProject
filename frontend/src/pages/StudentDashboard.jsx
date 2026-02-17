@@ -338,8 +338,17 @@ export default function StudentDashboard() {
                     const found = mentors.find(
                       (m) => String(m?.user?._id) === mentorId || String(m?._id) === mentorId
                     );
-                    const name = found?.user?.fullName || found?.fullName || mentorId;
-                    const universityKey = found?.user?.university || found?.institution || "";
+                    const name =
+                      found?.user?.fullName ||
+                      found?.fullName ||
+                      r?.fullName ||
+                      "Mentor";
+                    const universityKey =
+                      found?.user?.university ||
+                      found?.institution ||
+                      r?.university ||
+                      r?.institution ||
+                      "";
                     const percent = Math.round((Number(r.score) || 0) * 100);
                     const reasons = Array.isArray(r.reasons) ? r.reasons.slice(0, 3) : [];
 

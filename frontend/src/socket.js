@@ -28,7 +28,8 @@ function getSocketOptions({ proxied, token }) {
 
 export function createSocket(token) {
   // Use passed token if available, otherwise fetch from storage
-  const finalToken = token || localStorage.getItem("token");
+  const finalToken =
+    token || sessionStorage.getItem("token") || localStorage.getItem("token");
 
   // Decide whether API host differs from frontend host (i.e. proxied via Vercel)
   let proxied = false;

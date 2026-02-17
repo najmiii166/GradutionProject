@@ -15,6 +15,7 @@ import { ensureAdminExists } from "./seed/seedAdmin.js";
 import { finalizeSessionsJob } from "./jobs/finalizeSessions.job.js";
 
 import Message from "./models/Message.js";
+import Conversation from "./models/Conversation.js";
 
 // ROUTES
 import healthRoutes from "./routes/health.routes.js";
@@ -95,7 +96,11 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+const uploadsRoot = path.join(__dirname, "..", "uploads");
+app.use("/uploads/idcards", express.static(path.join(uploadsRoot, "idcards")));
+app.use("/uploads/chat", (_req, res) => {
+  return res.status(403).json({ message: "Direct chat attachment access denied" });
+});
 
 // ROUTES
 app.use("/api", healthRoutes);
@@ -145,6 +150,23 @@ app.set("io", io);
 
 io.use(socketAuth);
 
+const onlineUsers = new Map(); // userId -> Set(socketId)
+const typingRateLimit = new Map(); // `${userId}:${conversationId}` -> ts
+const roomForConversation = (conversationId) => `convo:${conversationId}`;
+
+async function canAccessConversation(conversationId, userId) {
+  if (!conversationId || !userId) return null;
+  try {
+    const convo = await Conversation.findById(conversationId).lean();
+    if (!convo) return null;
+    const allowed =
+      String(convo.mentor) === String(userId) || String(convo.student) === String(userId);
+    return allowed ? convo : null;
+  } catch {
+    return null;
+  }
+}
+
 io.on("connection", (socket) => {
   console.log("🔌 Socket Connected:", socket.id);
 
@@ -157,11 +179,155 @@ io.on("connection", (socket) => {
     const room = userId.toString();
     socket.join(room);
     console.log("👤 Socket joined user room:", room);
+
+    const key = String(userId);
+    const set = onlineUsers.get(key) || new Set();
+    set.add(socket.id);
+    onlineUsers.set(key, set);
+
+    io.emit("user_status", { userId: key, status: "online" });
   } else {
     console.warn("Socket connected without userId; no user room joined");
   }
 
-  socket.on("disconnect", () => console.log("❌ Socket Disconnected"));
+  socket.on("user_online", () => {
+    if (!userId) return;
+    io.emit("user_status", { userId: String(userId), status: "online" });
+  });
+
+  socket.on("get_user_status", (targetUserId) => {
+    if (!targetUserId) return;
+    const isOnline = (onlineUsers.get(String(targetUserId))?.size || 0) > 0;
+    socket.emit("user_status", {
+      userId: String(targetUserId),
+      status: isOnline ? "online" : "offline",
+    });
+  });
+
+  socket.on("join_conversation", async ({ conversationId } = {}) => {
+    if (!userId || !conversationId) return;
+    const convo = await canAccessConversation(conversationId, userId);
+    if (!convo) return;
+    socket.join(roomForConversation(conversationId));
+  });
+
+  socket.on("typing", async ({ conversationId } = {}) => {
+    if (!userId || !conversationId) return;
+    const convo = await canAccessConversation(conversationId, userId);
+    if (!convo) return;
+
+    // Lightweight per-user+conversation typing throttling
+    const rateKey = `${userId}:${conversationId}`;
+    const now = Date.now();
+    const prev = typingRateLimit.get(rateKey) || 0;
+    if (now - prev < 800) return;
+    typingRateLimit.set(rateKey, now);
+
+    socket.to(roomForConversation(conversationId)).emit("typing", {
+      conversationId: String(conversationId),
+      userId: String(userId),
+    });
+  });
+
+  socket.on("seen", async ({ conversationId, messageId } = {}) => {
+    if (!userId || !conversationId || !messageId) return;
+    const convo = await canAccessConversation(conversationId, userId);
+    if (!convo) return;
+
+    const msg = await Message.findById(messageId).select("conversation sender").lean();
+    if (!msg || String(msg.conversation) !== String(conversationId)) return;
+    // Sender cannot mark own message as seen
+    if (String(msg.sender) === String(userId)) return;
+
+    io.to(roomForConversation(conversationId)).emit("seen", {
+      conversationId: String(conversationId),
+      messageId: String(messageId),
+      seenBy: String(userId),
+    });
+  });
+
+  socket.on("message:react", async ({ conversationId, messageId, emoji } = {}) => {
+    if (!userId || !messageId || !emoji) return;
+    const msg = await Message.findById(messageId);
+    if (!msg) return;
+
+    const convoId = conversationId || String(msg.conversation);
+    const convo = await canAccessConversation(convoId, userId);
+    if (!convo || String(msg.conversation) !== String(convoId)) return;
+
+    const mine = msg.reactions.find(
+      (r) => String(r.user) === String(userId) && String(r.emoji) === String(emoji)
+    );
+    if (!mine) {
+      msg.reactions.push({ user: userId, emoji });
+      await msg.save();
+    }
+
+    io.to(roomForConversation(convoId)).emit("message:react", {
+      _id: String(msg._id),
+      conversationId: String(convoId),
+      reactions: msg.reactions,
+    });
+  });
+
+  socket.on("message:edit", async ({ conversationId, messageId, text } = {}) => {
+    if (!userId || !messageId || typeof text !== "string") return;
+    const msg = await Message.findById(messageId).populate("sender", "fullName _id");
+    if (!msg) return;
+
+    const convoId = conversationId || String(msg.conversation);
+    const convo = await canAccessConversation(convoId, userId);
+    if (!convo || String(msg.conversation) !== String(convoId)) return;
+
+    // Sender ownership enforced
+    if (String(msg.sender?._id || msg.sender) !== String(userId)) return;
+
+    msg.text = text;
+    msg.edited = true;
+    await msg.save();
+
+    io.to(roomForConversation(convoId)).emit("message:updated", {
+      ...msg.toObject(),
+      conversationId: String(convoId),
+    });
+  });
+
+  socket.on("message:delete", async ({ conversationId, messageId } = {}) => {
+    if (!userId || !messageId) return;
+    const msg = await Message.findById(messageId);
+    if (!msg) return;
+
+    const convoId = conversationId || String(msg.conversation);
+    const convo = await canAccessConversation(convoId, userId);
+    if (!convo || String(msg.conversation) !== String(convoId)) return;
+
+    // Sender ownership enforced
+    if (String(msg.sender) !== String(userId)) return;
+
+    msg.deleted = true;
+    msg.text = "";
+    await msg.save();
+
+    io.to(roomForConversation(convoId)).emit("message:deleted", {
+      _id: String(msg._id),
+      conversationId: String(convoId),
+    });
+  });
+
+  socket.on("disconnect", () => {
+    if (userId) {
+      const key = String(userId);
+      const set = onlineUsers.get(key) || new Set();
+      set.delete(socket.id);
+      if (set.size === 0) {
+        onlineUsers.delete(key);
+        io.emit("user_status", { userId: key, status: "offline" });
+      } else {
+        onlineUsers.set(key, set);
+      }
+    }
+    console.log("❌ Socket Disconnected");
+  });
 });
 
 /* ===============================

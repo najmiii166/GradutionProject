@@ -141,6 +141,19 @@ function extractMentorAttributes(mentorDoc) {
 // Format a single slot into a user-friendly string
 function formatSlot(slot) {
   if (!slot) return null;
+
+  const formatTime12h = (value) => {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return raw;
+    const hour24 = Number(match[1]);
+    const minute = match[2];
+    if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return raw;
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 || 12;
+    return `${hour12}:${minute} ${period}`;
+  };
+
   try {
     if (typeof slot === "string") {
       const s = slot.trim();
@@ -160,8 +173,8 @@ function formatSlot(slot) {
     }
     if (typeof slot === "object") {
       const day = String(slot.day || "").trim();
-      const from = String(slot.from || "").trim();
-      const to = String(slot.to || "").trim();
+      const from = formatTime12h(slot.from);
+      const to = formatTime12h(slot.to);
       if (day || from || to) {
         return `${day}${from ? ` ${from}` : ""}${to ? ` - ${to}` : ""}`.trim();
       }
@@ -192,14 +205,24 @@ export async function recommendMentors({ studentId, limit = 3, preferredDays } =
     ? extractStudentPreferences(student)
     : { skills: [], preferredTimeSlots: [], goal: "" };
 
-  // Fetch mentors. If verification/active fields exist on profile, filter; otherwise fetch all.
-  // MentorProfile schema in this project doesn't include status/active flags, so fetch all.
-  const mentors = await MentorProfile.find({}).lean().catch(() => []);
+  const mentorQuery = studentSkills.length
+    ? { expertiseAreas: { $in: studentSkills } }
+    : {};
+
+  // Match StudentDashboard/AllMentors behavior: only verified mentor users.
+  const mentors = await MentorProfile.find(mentorQuery)
+    .populate("user", "_id fullName university status role")
+    .lean()
+    .catch(() => []);
+
+  const verifiedMentors = (mentors || []).filter(
+    (m) => m?.user?.status === "verified" && m?.user?.role === "mentor"
+  );
 
   const totalStudentSkills = Math.max(1, (studentSkills || []).length);
 
   // Prepare mentors and compute max number of time slots among them
-  const prepared = (mentors || []).map((m) => {
+  const prepared = verifiedMentors.map((m) => {
     const attrs = extractMentorAttributes(m);
     return { m, ...attrs };
   });
@@ -230,7 +253,9 @@ export async function recommendMentors({ studentId, limit = 3, preferredDays } =
       score = (skillMatch * 0.5) + (availabilityScore * 0.3) + (ratingScore * 0.2);
     }
 
-    const mentorId = (m && (m.user || m._id)) ? String(m.user || m._id) : "";
+    const mentorId = m?._id ? String(m._id) : "";
+    const fullName = String(m?.user?.fullName || "").trim();
+    const university = String(m?.user?.university || m?.institution || "").trim();
     const ratingDisplay = Number.isFinite(rating) ? Math.round(rating * 10) / 10 : 3;
 
     const availabilityPreview = (Array.isArray(rawSlots) ? rawSlots : [])
@@ -267,7 +292,17 @@ export async function recommendMentors({ studentId, limit = 3, preferredDays } =
       }
     }
 
-    return { mentorId, score, reasons, availabilityPreview, availabilityCount: slotsCount };
+    return {
+      mentorId,
+      userId: m?.user?._id ? String(m.user._id) : "",
+      fullName,
+      university,
+      institution: String(m?.institution || ""),
+      score,
+      reasons,
+      availabilityPreview,
+      availabilityCount: slotsCount,
+    };
   });
 
   // Sort by score desc and slice to limit

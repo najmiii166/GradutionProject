@@ -5,6 +5,12 @@ import { createSocket } from "../socket";
 
 export const SocketContext = createContext(null);
 
+const readScopedAuth = (key) => {
+  const fromSession = sessionStorage.getItem(key);
+  if (fromSession) return fromSession;
+  return localStorage.getItem(key);
+};
+
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   // Lazy init from storage to be persistent
@@ -22,7 +28,7 @@ export function SocketProvider({ children }) {
   const navigate = useNavigate();
   // We need to listen to storage changes if we want to react to token changes from other tabs,
   // or just re-read it.
-  const token = localStorage.getItem("token");
+  const token = readScopedAuth("token");
 
   // Keep ref synced
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
@@ -43,7 +49,7 @@ export function SocketProvider({ children }) {
 
   // Main Socket Effect
   useEffect(() => {
-    const startToken = localStorage.getItem("token");
+    const startToken = readScopedAuth("token");
     
     // Hard Reset if no token
     if (!startToken) {
@@ -63,7 +69,7 @@ export function SocketProvider({ children }) {
       // Identity Handshake with fallback retry if userId is missing
       const sendSetup = () => {
         try {
-          const userStr = localStorage.getItem("user");
+          const userStr = readScopedAuth("user");
           if (!userStr) {
             console.warn("Socket setup: user not found in localStorage");
             return false;
