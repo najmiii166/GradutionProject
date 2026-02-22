@@ -150,7 +150,7 @@ router.get("/mentor", auth, async (req, res) => {
   const mentorId = req.user.id;
 
   const convos = await Conversation.find({ mentor: mentorId })
-    .populate("student", "fullName")
+    .populate("student", "fullName profileImageUrl")
     .sort({ lastMessageAt: -1 })
     .lean();
 
@@ -158,6 +158,7 @@ router.get("/mentor", auth, async (req, res) => {
     convos.map((c) => ({
       _id: c._id,
       studentName: c.student?.fullName,
+      studentImage: c.student?.profileImageUrl || "",
       lastMessage: c.lastMessage,
       lastMessageAt: c.lastMessageAt || c.updatedAt,
     }))
@@ -171,7 +172,7 @@ router.get("/student", auth, async (req, res) => {
   const studentId = req.user.id;
 
   const convos = await Conversation.find({ student: studentId })
-    .populate("mentor", "fullName")
+    .populate("mentor", "fullName profileImageUrl")
     .sort({ lastMessageAt: -1 })
     .lean();
 
@@ -179,6 +180,7 @@ router.get("/student", auth, async (req, res) => {
     convos.map((c) => ({
       _id: c._id,
       mentorName: c.mentor?.fullName,
+      mentorImage: c.mentor?.profileImageUrl || "",
       lastMessage: c.lastMessage,
       lastMessageAt: c.lastMessageAt || c.updatedAt,
     }))
@@ -196,11 +198,11 @@ router.get("/:id/messages", auth, async (req, res) => {
   if (!convo) return res.status(403).json({ message: "Not allowed" });
 
   const messages = await Message.find({ conversation: convoId })
-    .populate("sender", "fullName _id") // FIXED
+    .populate("sender", "fullName _id profileImageUrl")
     .populate({
       path: "replyTo",
       select: "_id text deleted sender fileName type",
-      populate: { path: "sender", select: "fullName _id" },
+      populate: { path: "sender", select: "fullName _id profileImageUrl" },
     })
     .sort({ createdAt: 1 })
     .lean();
@@ -342,11 +344,11 @@ router.post(
     }
 
     const populated = await msg.populate([
-      { path: "sender", select: "fullName _id" },
+      { path: "sender", select: "fullName _id profileImageUrl" },
       {
         path: "replyTo",
         select: "_id text deleted sender fileName type",
-        populate: { path: "sender", select: "fullName _id" },
+        populate: { path: "sender", select: "fullName _id profileImageUrl" },
       },
     ]);
 

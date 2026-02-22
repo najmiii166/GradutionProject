@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { UserCheck, ShieldAlert, Search, Mail, Calendar, GraduationCap } from "lucide-react";
 import { universities } from "../../constants/systemData";
+import UserAvatar from "../../components/UserAvatar";
 
 export default function UsersManagementPage({ users, loading, view, setView, handleUnverify, handleVerify }) {
   return (
@@ -83,13 +84,16 @@ export default function UsersManagementPage({ users, loading, view, setView, han
                     className="group hover:bg-foreground/[0.01] transition-colors"
                   >
                     <td className="py-5 px-8">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-foreground group-hover:text-cyan-500 transition-colors">
-                          {u.fullName}
-                        </span>
-                        <span className="text-xs text-foreground/40 flex items-center gap-1.5 mt-0.5">
-                          <Mail size={10} /> {u.email}
-                        </span>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar name={u.fullName} src={u.profileImageUrl} size={36} />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-foreground group-hover:text-cyan-500 transition-colors">
+                            {u.fullName}
+                          </span>
+                          <span className="text-xs text-foreground/40 flex items-center gap-1.5 mt-0.5">
+                            <Mail size={10} /> {u.email}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="py-5 px-8">

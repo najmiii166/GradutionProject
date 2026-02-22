@@ -7,8 +7,10 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Brand from "../Brand";
 import ChatNotificationBadge from "../ChatNotificationBadge";
+import UserAvatar from "../UserAvatar";
 
 export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   // 1. Initialize from localStorage so it doesn't "reset" to true on reload
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -105,20 +107,6 @@ export default function StudentSidebar({ activeTab, setActiveTab, navigate }) {
 
       {/* 3. BOTTOM ACTIONS */}
       <div className="flex flex-col items-center gap-6 pb-2">
-        
-        {/* Theme Toggle */}
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className="p-3 rounded-2xl text-foreground/40 hover:bg-foreground/5 hover:text-foreground transition-all"
-          title={isDark ? "Switch to Light" : "Switch to Dark"}
-        >
-          {isDark ? (
-            <Sun size={20} className="text-orange-400" />
-          ) : (
-            <Moon size={20} className="text-cyan-500" />
-          )}
-        </button>
-
         {/* Logout */}
         <button
           onClick={handleLogout}

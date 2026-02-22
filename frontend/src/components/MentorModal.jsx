@@ -4,6 +4,7 @@ import { Briefcase, Calendar, Info, X, ChevronRight , CheckCircle2} from "lucide
 import { motion, AnimatePresence } from "framer-motion";
 import MentorQuestionnaire from "./MentorQuestionnaire";
 import { universities } from "../constants/systemData";
+import UserAvatar from "./UserAvatar";
 
 const formatTime12h = (value) => {
   const raw = String(value || "").trim();
@@ -138,9 +139,12 @@ export default function MentorModal({ mentor, onClose, onRequestSent, disabledGl
               <div className="p-4 rounded-2xl bg-foreground/[0.03] border border-border/50">
                 
                 <div className="flex gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shrink-0 shadow-lg shadow-cyan-500/20">
-  {mentor.user?.fullName?.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-</div>
+                  <UserAvatar
+                    src={mentor.user?.profileImageUrl || ""}
+                    name={mentor.user?.fullName || "Mentor"}
+                    size={48}
+                    className="shrink-0"
+                  />
                   <div>
                     <h3 className="text-sm font-bold text-foreground">{mentor.user?.fullName}</h3>
                     <p className="text-xs text-foreground/50">

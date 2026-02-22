@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -14,7 +17,7 @@ import {
   studentRegisterRules,
   loginRules,
 } from "../utils/validators.js";
-import { uploadIdCard } from "../middleware/upload.js";
+import { uploadIdentityAssets, uploadProfileImage } from "../middleware/upload.js";
 import { auth } from "../middleware/auth.js";
 import { sendPasswordResetEmail } from "../services/mailer.js";
 
@@ -46,11 +49,10 @@ const signToken = (user) =>
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
-
 /* =======================================================
    REGISTER MENTOR
 ======================================================= */
-router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
+router.post("/register/mentor", uploadProfileImage.single("profileImage"), mentorRegisterRules, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -80,23 +82,56 @@ router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
       email,
       passwordHash,
       university,
+      profileImageUrl: req.file ? `/uploads/avatars/${req.file.filename}` : "",
       status: "pending",
     });
 
-    const expertiseList = Array.isArray(expertiseAreas)
-      ? expertiseAreas.map((x) => String(x).trim())
-      : String(expertiseAreas || "")
+    let expertiseList = [];
+    if (Array.isArray(expertiseAreas)) {
+      expertiseList = expertiseAreas.map((x) => String(x).trim()).filter(Boolean);
+    } else if (typeof expertiseAreas === "string") {
+      try {
+        const parsed = JSON.parse(expertiseAreas);
+        expertiseList = Array.isArray(parsed)
+          ? parsed.map((x) => String(x).trim()).filter(Boolean)
+          : [];
+      } catch {
+        expertiseList = String(expertiseAreas || "")
           .split(",")
           .map((x) => x.trim())
           .filter(Boolean);
+      }
+    }
 
-    const cleanAvailability = Array.isArray(availability)
-      ? availability.map((slot) => ({
-          day: String(slot.day || "").trim(),
-          from: String(slot.from || "").trim(),
-          to: String(slot.to || "").trim(),
-        }))
-      : [];
+    let cleanAvailability = [];
+    if (Array.isArray(availability)) {
+      cleanAvailability = availability;
+    } else if (typeof availability === "string") {
+      try {
+        const parsed = JSON.parse(availability);
+        cleanAvailability = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        cleanAvailability = [];
+      }
+    }
+
+    cleanAvailability = cleanAvailability.map((slot) => ({
+      day: String(slot.day || "").trim(),
+      from: String(slot.from || "").trim(),
+      to: String(slot.to || "").trim(),
+    }));
+
+    let cleanSocialLinks = {};
+    if (socialLinks && typeof socialLinks === "object") {
+      cleanSocialLinks = socialLinks;
+    } else if (typeof socialLinks === "string") {
+      try {
+        const parsed = JSON.parse(socialLinks);
+        cleanSocialLinks = parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        cleanSocialLinks = {};
+      }
+    }
 
     await MentorProfile.create({
       user: user._id,
@@ -107,10 +142,23 @@ router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
       bio,
       expertiseAreas: expertiseList,
       availability: cleanAvailability,
-      socialLinks: socialLinks || {},
+      socialLinks: cleanSocialLinks,
     });
 
-    res.status(201).json({ message: "Mentor registered. Await admin verification." });
+    const token = signToken(user);
+    res.status(201).json({
+      message: "Mentor registered. Await admin verification.",
+      token,
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        university: user.university,
+        profileImageUrl: user.profileImageUrl || "",
+      },
+    });
   } catch (err) {
     console.error("Mentor registration error:", err);
     res.status(500).json({ message: "Server error" });
@@ -122,13 +170,19 @@ router.post("/register/mentor", mentorRegisterRules, async (req, res) => {
 ======================================================= */
 router.post(
   "/register/student",
-  uploadIdCard.single("idCard"),
+  uploadIdentityAssets.fields([
+    { name: "idCard", maxCount: 1 },
+    { name: "profileImage", maxCount: 1 },
+  ]),
   studentRegisterRules,
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    if (!req.file)
+    const idCardFile = req.files?.idCard?.[0] || null;
+    const profileImageFile = req.files?.profileImage?.[0] || null;
+
+    if (!idCardFile)
       return res.status(400).json({ message: "ID card image is required" });
 
     const {
@@ -152,10 +206,11 @@ router.post(
       email,
       passwordHash,
       university,
+      profileImageUrl: profileImageFile ? `/uploads/avatars/${profileImageFile.filename}` : "",
       status: "pending",
     });
 
-    const idCardUrl = `/uploads/idcards/${req.file.filename}`;
+    const idCardUrl = `/uploads/idcards/${idCardFile.filename}`;
 
     let mentorshipAreasArray = [];
     if (mentorshipAreas) {
@@ -184,9 +239,20 @@ router.post(
       mentorshipAreas: mentorshipAreasArray,
     });
 
+    const token = signToken(user);
     res.status(201).json({
       message: "Student registered. Await admin verification.",
       idCardUrl,
+      token,
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        university: user.university,
+        profileImageUrl: user.profileImageUrl || "",
+      },
     });
   }
 );
@@ -216,6 +282,7 @@ router.post("/login", loginRules, async (req, res) => {
       role: user.role,
       status: user.status,
       university: user.university,
+      profileImageUrl: user.profileImageUrl || "",
     },
   });
 });
@@ -249,6 +316,13 @@ router.get("/me", auth, async (req, res) => {
     let profile = null;
     if (user.role === "mentor") {
       profile = await MentorProfile.findOne({ user: user._id }).lean();
+      if (profile) {
+        // Always include profileImageUrl in mentor profile for frontend reliability
+        profile.profileImageUrl = user.profileImageUrl || "";
+        if (profile.user && typeof profile.user === 'object') {
+          profile.user.profileImageUrl = user.profileImageUrl || "";
+        }
+      }
     } else if (user.role === "student") {
       profile = await StudentProfile.findOne({ user: user._id }).lean();
     }
@@ -261,6 +335,7 @@ router.get("/me", auth, async (req, res) => {
         role: user.role,
         university: user.university,
         status: user.status,
+        profileImageUrl: user.profileImageUrl || "",
       },
       profile,
     });

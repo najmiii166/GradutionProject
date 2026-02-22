@@ -29,7 +29,7 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
     const mentorProfiles = await MentorProfile.find({
       expertiseAreas: { $in: mentorshipAreas },
     })
-      .populate("user", "fullName university status role")
+      .populate("user", "fullName university status role profileImageUrl")
       .lean();
 
     // Include only verified mentors and relevant fields

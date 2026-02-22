@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle({ className = "" }) {
+export default function ThemeToggle({ className = "", iconSize = 16, sunClass = "", moonClass = "" }) {
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem("theme") || (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -28,9 +28,11 @@ export default function ThemeToggle({ className = "" }) {
       onClick={toggle}
       aria-label="Toggle color theme"
       title="Toggle theme"
-      className={`inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-card text-foreground hover:opacity-90 transition ${className}`}
+      className={`inline-flex items-center justify-center w-9 h-9 ${className}`}
     >
-      {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      {theme === "dark"
+        ? <Sun size={iconSize} className={sunClass} />
+        : <Moon size={iconSize} className={moonClass} />}
     </button>
   );
 }

@@ -35,6 +35,7 @@ export default function MentorDashboard() {
   const role = localStorage.getItem("role");
   const status = localStorage.getItem("status");
   const fullName = localStorage.getItem("fullName") || "Mentor";
+  // we'll compute profileImageUrl after hooks where `profile` is available
 
   if (!token) return <Navigate to="/login" />;
   if (role !== "mentor") return <Navigate to="/" />;
@@ -72,6 +73,12 @@ export default function MentorDashboard() {
   // --- HOOKS ---
   const { studentModalOpen, openStudentProfile, closeStudentProfile, studentProfile, loadingStudentProfile } = useStudentProfile(setToast);
   const { profile, loadingProfile, editingAvailability, setEditingAvailability, saveAvailability, savingAvailability } = useMentorProfile(setToast);
+  // now that we have profile state, derive the navbar image (fallback to stored user)
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const profileImageUrl =
+    (profile && profile.profileImageUrl) ||
+    storedUser.profileImageUrl ||
+    "";
   const { stats } = useMentorStats(setToast);
   const { requests, loadingRequests, syncingRequests, fetchRequests, handleRequestAction } = useMentorRequests(setToast);
   const { upcomingSessions, loadingSessions, syncingSessions, fetchUpcomingSessions } = useMentorSessions(setToast);
@@ -146,6 +153,7 @@ export default function MentorDashboard() {
         setNotifications={setNotifications}
         setMentorModalOpen={setMentorModalOpen}
         fullName={fullName}
+        profileImageUrl={profileImageUrl}
         activeTab={activeTab}
         status={status}
       />

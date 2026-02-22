@@ -19,6 +19,7 @@ import {
   User,
   Activity
 } from "lucide-react";
+import UserAvatar from "../components/UserAvatar";
 
 function formatDuration(start, end) {
   if (!start || !end) return "—";
@@ -224,10 +225,14 @@ export default function HistoryPage() {
               <div className="grid grid-cols-1 gap-4">
                 {visible.map((s, idx) => {
                   const completed = s.status === "completed";
-                  const otherParty =
+                  const otherPartyName =
                     role === "mentor"
                       ? s.studentId?.fullName
                       : s.mentorId?.user?.fullName;
+                  const otherPartyImage =
+                    role === "mentor"
+                      ? s.studentId?.profileImageUrl
+                      : s.mentorId?.user?.profileImageUrl;
 
                   return (
                     <motion.div
@@ -241,14 +246,15 @@ export default function HistoryPage() {
                         
                         {/* IDENTITY & TIME */}
                         <div className="flex items-center gap-5">
-                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-colors duration-500 ${
-                            completed ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-500" : "bg-rose-500/5 border-rose-500/20 text-rose-500"
-                          }`}>
-                            <User size={24} />
-                          </div>
+                          <UserAvatar
+                            src={otherPartyImage || ""}
+                            name={otherPartyName || "Unknown Identity"}
+                            size={56}
+                            className={`border-2 ${completed ? "border-emerald-500/40" : "border-rose-500/40"}`}
+                          />
                           <div>
                             <h3 className="text-lg font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">
-                              {otherParty || "Unknown Identity"}
+                              {otherPartyName || "Unknown Identity"}
                             </h3>
                             <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1">
                               <span className="flex items-center gap-1.5 text-[11px] font-bold text-foreground/40 uppercase tracking-wider">

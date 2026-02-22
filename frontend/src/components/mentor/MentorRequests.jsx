@@ -14,6 +14,7 @@ import {
 import Spinner from "../Spinner";
 import { faculties } from "../../constants/systemData";
 import { api } from "../../api/axios";
+import UserAvatar from "../UserAvatar";
 
 const formatTime = (time) => {
   if (!time) return "";
@@ -130,9 +131,12 @@ export default function MentorRequests({
                     </div>
 
                     <div className="flex gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20 shadow-inner shrink-0">
-                        <User size={22} />
-                      </div>
+                      <UserAvatar
+                        src={student.profileImageUrl || ""}
+                        name={student.fullName || "Student"}
+                        size={40}
+                        className="shrink-0"
+                      />
                       <div>
                         <h4 className="text-sm font-bold text-foreground/90 leading-tight">
                           {student.fullName || "Student"}
@@ -234,7 +238,14 @@ export default function MentorRequests({
                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[8px] font-black uppercase text-cyan-600">Follow-up Session</span>
                   )}
                 </div>
-                <h3 className="text-xl font-bold text-foreground/90">Reviewing {selectedRequest.studentId?.fullName}'s Intent</h3>
+                <div className="flex items-center gap-3">
+                  <UserAvatar
+                    src={selectedRequest.studentId?.profileImageUrl || ""}
+                    name={selectedRequest.studentId?.fullName || "Student"}
+                    size={36}
+                  />
+                  <h3 className="text-lg font-semibold text-foreground/90"> {selectedRequest.studentId?.fullName} </h3>
+                </div>
               </div>
 
               <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">

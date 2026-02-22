@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Mail } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
-import { getInitials } from "../../utils/student";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "../UserAvatar";
 
 export default function StudentNavbar({
   user,
@@ -67,7 +67,13 @@ export default function StudentNavbar({
 
         {/* Actions */}
         <div className="flex items-center gap-3 bg-sidebar/90 border border-border/40 p-1.5 rounded-2xl shadow">
-          <ThemeToggle className="hidden sm:inline-flex" />
+          {/* Custom Theme Toggle (Sidebar Style) */}
+          <ThemeToggle
+            className="p-3 rounded-2xl text-foreground/40 hover:bg-foreground/5 hover:text-foreground transition-all"
+            iconSize={28}
+            sunClass="text-orange-400"
+            moonClass="text-cyan-500"
+          />
           <div className="w-[1px] h-6 bg-border/50" />
         
         <div className="relative flex items-center justify-center">
@@ -135,9 +141,12 @@ export default function StudentNavbar({
           className="flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-foreground/5 transition-all group"
           aria-label="Open profile"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-500/10 group-hover:scale-105 transition-transform">
-            {getInitials(user.fullName)}
-          </div>
+          <UserAvatar
+            name={user?.fullName}
+            src={user?.profileImageUrl}
+            size={36}
+            className="group-hover:scale-105 transition-transform"
+          />
         </button>
         </div>
       </div>

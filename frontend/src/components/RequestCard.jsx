@@ -3,6 +3,7 @@ import useCountdown from "../hooks/useCountdown";
 import { MessageCircle, Calendar, ExternalLink, XCircle, Trash2, User, Clock } from "lucide-react";
 import { isJoinWindowOpen } from "../utils/joinWindow";
 import { motion } from "framer-motion";
+import UserAvatar from "./UserAvatar";
 
 export default function RequestCard({
   r,
@@ -46,9 +47,12 @@ export default function RequestCard({
         {/* HEADER */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
-              <User size={18} />
-            </div>
+            <UserAvatar
+              src={r.mentorId?.user?.profileImageUrl || ""}
+              name={r.mentorId?.user?.fullName || "Mentor"}
+              size={40}
+              className="shrink-0"
+            />
             <div className="min-w-0">
               <h3 className="text-[13px] font-bold text-foreground/90 truncate leading-none">
                 {r.mentorId?.user?.fullName || "Mentor"}

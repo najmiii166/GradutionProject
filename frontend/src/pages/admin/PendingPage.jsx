@@ -3,6 +3,7 @@ import { UserCheck, Users, Eye, School } from "lucide-react";
 import { universities } from "../../constants/systemData";
 import Toast from "../../components/Toast";
 import DetailsModal from "../../components/admin/DetailsModal";
+import UserAvatar from "../../components/UserAvatar";
 
 export default function PendingPage({
   pending,
@@ -129,9 +130,7 @@ export default function PendingPage({
                       >
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-violet-500/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-                              {u.fullName?.charAt(0)}
-                            </div>
+                            <UserAvatar name={u.fullName} src={u.profileImageUrl} size={40} />
                             <div>
                               <p className="text-sm font-semibold text-foreground leading-none">{u.fullName}</p>
                               <span className="text-[10px] text-foreground/30 uppercase tracking-wider">{u.role}</span>

@@ -35,8 +35,22 @@ export default function useMentorProfile(setToast) {
         if (!mounted) return;
 
         setProfile(data.profile || null);
-        if (data.fullName) localStorage.setItem("fullName", data.fullName);
-
+        const meUser = data?.user || {};
+        // Always update local/session storage with latest user object
+        if (meUser.fullName) {
+          localStorage.setItem("fullName", meUser.fullName);
+          sessionStorage.setItem("fullName", meUser.fullName);
+        }
+        if (meUser._id) {
+          localStorage.setItem("user", JSON.stringify(meUser));
+          sessionStorage.setItem("user", JSON.stringify(meUser));
+        }
+        if (data.profile?.profileImageUrl || meUser.profileImageUrl) {
+          // Always sync image field
+          const merged = { ...meUser, profileImageUrl: data.profile?.profileImageUrl || meUser.profileImageUrl };
+          localStorage.setItem("user", JSON.stringify(merged));
+          sessionStorage.setItem("user", JSON.stringify(merged));
+        }
         if (data.profile?.availability) {
           setEditingAvailability(data.profile.availability);
         }

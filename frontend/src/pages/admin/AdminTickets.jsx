@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
 import { 
   Ticket, 
   CheckCircle2, 
-  Clock, 
-  User as UserIcon
+  Clock
 } from "lucide-react";
 import { api } from '../../api/axios';
+import UserAvatar from "../../components/UserAvatar";
 
 export default function AdminTickets() {
   const [tickets, setTickets] = useState([]);
@@ -116,9 +116,12 @@ export default function AdminTickets() {
                   <tr key={t._id} className="hover:bg-foreground/[0.01] transition-colors group">
                     <td className="py-6 px-8 text-foreground">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-                          <UserIcon size={14} />
-                        </div>
+                        <UserAvatar
+                          name={t.user?.fullName || t.senderName}
+                          src={t.user?.profileImageUrl || ""}
+                          size={32}
+                          showInitials={false}
+                        />
                         <div>
                           <div className="font-semibold group-hover:text-cyan-500 transition-colors uppercase text-[11px] tracking-wider">
                             {t.user?.fullName || t.senderName}

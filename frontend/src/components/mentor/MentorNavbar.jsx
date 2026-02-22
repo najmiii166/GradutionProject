@@ -2,8 +2,8 @@
 import { Bell } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 import MentorNotifications from "./MentorNotifications";
-import { getInitials } from "../../utils/mentor";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "../UserAvatar";
 
 export default function MentorNavbar({
   requests,
@@ -17,6 +17,7 @@ export default function MentorNavbar({
   setNotifications,
   setMentorModalOpen,
   fullName,
+  profileImageUrl,
   activeTab,
   status,
 }) {
@@ -52,7 +53,13 @@ export default function MentorNavbar({
 
         {/* Action Pill Container */}
         <div className="flex items-center gap-3 bg-sidebar/90 border border-border/40 p-1.5 rounded-2xl shadow">
-          <ThemeToggle className="hidden sm:inline-flex" />
+          {/* Custom Theme Toggle (Sidebar Style) */}
+          <ThemeToggle
+            className="p-3 rounded-2xl text-sidebar-foreground/50 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground transition-all"
+            iconSize={28}
+            sunClass="text-orange-400"
+            moonClass="text-cyan-500"
+          />
           <div className="w-[1px] h-6 bg-border/50" />
         
         {/* Notifications Trigger */}
@@ -120,9 +127,12 @@ export default function MentorNavbar({
           className="flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-white/10 transition-all group"
           aria-label="Open profile"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-500/10 group-hover:scale-105 transition-transform">
-            {getInitials(fullName)}
-          </div>
+          <UserAvatar
+            name={fullName}
+            src={profileImageUrl}
+            size={36}
+            className="group-hover:scale-105 transition-transform"
+          />
         </button>
         </div>
       </div>

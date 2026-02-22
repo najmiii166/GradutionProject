@@ -75,6 +75,7 @@ export default function ChatScreen() {
   const [conversations, setConversations] = useState(initialConversationsCache || []);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [activePartnerName, setActivePartnerName] = useState("");
+  const [activePartnerImage, setActivePartnerImage] = useState("");
   const [activePartnerId, setActivePartnerId] = useState(null);
   const [showMentorModal, setShowMentorModal] = useState(false);
   const [mentorLoading, setMentorLoading] = useState(false);
@@ -211,6 +212,7 @@ export default function ChatScreen() {
     const conv = conversations.find((c) => c._id === activeConversationId);
     if (conv) {
       setActivePartnerName(role === "student" ? conv.mentorName : conv.studentName);
+      setActivePartnerImage(role === "student" ? conv.mentorImage : conv.studentImage);
       setActivePartnerId(
         role === "student" ? conv.mentorId || conv.mentor?._id : conv.studentId || conv.student?._id
       );
@@ -629,6 +631,7 @@ export default function ChatScreen() {
           ) : (
             filtered.map((c) => {
               const name = role === "student" ? c.mentorName : c.studentName;
+              const image = role === "student" ? c.mentorImage : c.studentImage;
               const active = activeConversationId === c._id;
               const count = unreadCounts?.[c._id] || 0;
               return (
@@ -646,7 +649,7 @@ export default function ChatScreen() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative shrink-0">
-                      <Avatar name={name} size={42} />
+                      <Avatar name={name} src={image} size={42} />
                       <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-background rounded-full flex items-center justify-center">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                       </div>
@@ -705,16 +708,18 @@ export default function ChatScreen() {
                       setShowMentorModal(true); setMentorLoading(true);
                       const { data } = await api.get(`/mentor/mentors/${partnerId}`);
                       setMentorProfile(data);
+                      setActivePartnerImage(data?.profileImageUrl || "");
                     } else {
                       setShowStudentModal(true); setStudentLoading(true);
                       const { data } = await api.get(`/mentor/students/${partnerId}`);
                       setStudentProfile(data);
+                      setActivePartnerImage(data?.profileImageUrl || "");
                     }
                   } catch { setToast("Failed to load node data"); }
                   finally { setMentorLoading(false); setStudentLoading(false); }
                 }}
               >
-                <Avatar name={activePartnerName} size={44} />
+                <Avatar name={activePartnerName} src={activePartnerImage} size={44} />
                 <div>
                   <h3 className="text-[14px] font-black uppercase tracking-tight text-foreground/90 group-hover:text-cyan-500 transition-colors">
                     {activePartnerName}

@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, lowercase: true },
     passwordHash: { type: String, required: true },
     university: { type: String },
+    profileImageUrl: { type: String, default: "" },
 
     status: {
       type: String,

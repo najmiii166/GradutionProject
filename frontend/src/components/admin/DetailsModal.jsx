@@ -7,6 +7,7 @@ import {
   GraduationCap, Linkedin, Twitter, Facebook, Globe, Target 
 } from "lucide-react";
 import { faculties } from "../../constants/systemData";
+import UserAvatar from "../UserAvatar";
 
 export default function DetailsModal({
   modalUser,
@@ -51,7 +52,9 @@ export default function DetailsModal({
         {/* Header */}
         <div className="px-8 py-8 border-b border-border/50 bg-foreground/[0.01] relative">
           <div className="flex justify-between items-start">
-            <div className="space-y-1">
+            <div className="space-y-1 flex items-start gap-3">
+              <UserAvatar name={modalUser?.fullName} src={modalUser?.profileImageUrl} size={52} />
+              <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-cyan-500">
                   Verification / {modalUser?.role}
@@ -61,6 +64,7 @@ export default function DetailsModal({
                 {modalUser?.fullName} <span className="italic font-serif text-foreground/40 text-lg">Details.</span>
               </h2>
               <p className="text-sm text-foreground/40">{modalUser?.email}</p>
+              </div>
             </div>
             <button onClick={closeDetails} className="p-2 rounded-full hover:bg-foreground/5 text-foreground/30 hover:text-foreground transition-all">
               <X size={20} />

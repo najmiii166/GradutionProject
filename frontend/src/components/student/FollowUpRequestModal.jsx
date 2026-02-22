@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../api/axios";
 import { Calendar, X, CheckCircle2 } from "lucide-react";
 import Spinner from "../Spinner";
+import UserAvatar from "../UserAvatar";
 
 export default function FollowUpRequestModal({ session, onClose, onSubmitted }) {
   const mentor = session?.mentorId;
@@ -79,9 +80,16 @@ export default function FollowUpRequestModal({ session, onClose, onSubmitted }) 
               <p className="text-[10px] uppercase tracking-[0.25em] font-black text-foreground/40 mb-1">
                 Mentor
               </p>
-              <p className="text-sm font-semibold text-foreground/90">
-                {mentor.user?.fullName || "Mentor"}
-              </p>
+              <div className="flex items-center gap-3">
+                <UserAvatar
+                  src={mentor.user?.profileImageUrl || ""}
+                  name={mentor.user?.fullName || "Mentor"}
+                  size={36}
+                />
+                <p className="text-sm font-semibold text-foreground/90">
+                  {mentor.user?.fullName || "Mentor"}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">

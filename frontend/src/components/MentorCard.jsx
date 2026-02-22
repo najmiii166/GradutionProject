@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Calendar, Sparkles, Briefcase, Star } from "lucide-react";
 import { faculties, universities } from "../constants/systemData";
+import UserAvatar from "./UserAvatar";
 
 const formatTime12h = (value) => {
   const raw = String(value || "").trim();
@@ -25,13 +26,6 @@ export default function MentorCard({ mentor, onClick, disabled = false }) {
   const averageRating = mentor.averageRating ?? mentor.user?.averageRating ?? 0;
   const totalRatings = mentor.totalRatings ?? 0;
 
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <motion.div
       whileHover={{ y: -5 }}
@@ -43,9 +37,12 @@ export default function MentorCard({ mentor, onClick, disabled = false }) {
       <div className="relative z-10">
         {/* 1. Header with Squircle Avatar */}
         <div className="flex items-start gap-3 mb-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-            {initials}
-          </div>
+          <UserAvatar
+            src={mentor.user?.profileImageUrl || ""}
+            name={name}
+            size={48}
+            className="shrink-0"
+          />
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-foreground tracking-tight truncate">
               {name}

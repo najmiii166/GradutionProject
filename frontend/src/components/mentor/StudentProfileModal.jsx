@@ -1,8 +1,9 @@
 // src/components/student/StudentProfileModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { User, University, BookOpen, GraduationCap, X, Mail } from "lucide-react";
+import { University, BookOpen, GraduationCap, X, Mail } from "lucide-react";
 import Spinner from "../../components/Spinner";
 import { faculties } from "../../constants/systemData"; // Import your constant
+import UserAvatar from "../UserAvatar";
 
 // Helper to match the MentorRequests logic
 const getFacultyName = (key) => {
@@ -30,9 +31,7 @@ export default function StudentProfileModal({ open, loading, profile, onClose })
             {/* Header: Name Only */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
-                  <User size={24} />
-                </div>
+                <UserAvatar name={profile?.user?.fullName || profile?.fullName} src={profile?.profileImageUrl || profile?.user?.profileImageUrl} size={48} />
                 <h2 className="text-xl font-bold text-foreground/90 tracking-tight">
                   {profile?.user?.fullName || profile?.fullName || "Student Identity"}
                 </h2>

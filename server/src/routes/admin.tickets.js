@@ -12,7 +12,7 @@ router.get('/tickets', auth, requireRole('admin'), async (req, res) => {
     const filter = {};
     if (source === 'public') filter.source = 'public';
     if (source === 'app') filter.source = 'app';
-    const tickets = await Ticket.find(filter).populate('user', 'fullName email role').sort({ createdAt: -1 }).lean();
+    const tickets = await Ticket.find(filter).populate('user', 'fullName email role profileImageUrl').sort({ createdAt: -1 }).lean();
     return res.json({ success: true, tickets });
   } catch (err) {
     console.error('List tickets error:', err);

@@ -1,10 +1,12 @@
 // src/pages/StudentRegister.jsx
 import { useState } from "react";
-import { api } from "../api/axios";
+import { api, setAuthToken } from "../api/axios";
+import { useNavigate } from "react-router-dom";
 import { universities, faculties } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
 import FileDrop from "../components/FileDrop";
+import UserAvatarPicker from "../components/UserAvatarPicker";
 import Toast from "../components/Toast";
 import ThemeToggle from "../components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,6 +26,7 @@ import {
 } from "lucide-react";
 
 export default function StudentRegister() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     fullName: "",
@@ -32,11 +35,11 @@ export default function StudentRegister() {
     semester: "",
   });
   const [idFile, setIdFile] = useState(null);
+  const [profileImageFile, setProfileImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isTypingPassword, setIsTypingPassword] = useState(false);
-  const [successModal, setSuccessModal] = useState(false);
   const [selectedUniKey, setSelectedUniKey] = useState(null);
   const [selectedFacultyKey, setSelectedFacultyKey] = useState(null);
   const [selectedLearningGoals, setSelectedLearningGoals] = useState([]);
@@ -77,12 +80,37 @@ export default function StudentRegister() {
     setStep(2);
   };
 
-  const submit = async (e) => {
+  const completeAcademicsStep = (e) => {
     e.preventDefault();
     if (!selectedUniKey) return setToast('Please select a university');
     if (!selectedFacultyKey) return setToast('Please select a faculty');
     if (!selectedLearningGoals.length) return setToast('Please select one learning goal');
     if (!idFile) return setToast('Please upload your Student ID');
+    setStep(3);
+  };
+
+  const persistAuth = (data) => {
+    const user = data?.user || {};
+    if (!data?.token || !user?._id) return false;
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("role", user.role || "student");
+    localStorage.setItem("status", user.status || "pending");
+    if (user.fullName) localStorage.setItem("fullName", user.fullName);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    sessionStorage.setItem("token", data.token);
+    sessionStorage.setItem("role", user.role || "student");
+    sessionStorage.setItem("status", user.status || "pending");
+    if (user.fullName) sessionStorage.setItem("fullName", user.fullName);
+    sessionStorage.setItem("user", JSON.stringify(user));
+
+    setAuthToken(data.token);
+    return true;
+  };
+
+  const submit = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
 
     const data = new FormData();
     data.append('fullName', form.fullName);
@@ -93,11 +121,15 @@ export default function StudentRegister() {
     data.append('semester', form.semester);
     data.append('mentorshipAreas', JSON.stringify(selectedLearningGoals));
     data.append("idCard", idFile);
+    if (profileImageFile) {
+      data.append("profileImage", profileImageFile);
+    }
 
     setLoading(true);
     try {
-      await api.post("/auth/register/student", data);
-      setSuccessModal(true);
+      const resp = await api.post("/auth/register/student", data);
+      persistAuth(resp.data);
+      navigate("/student/dashboard");
     } catch (err) {
       const resp = err.response?.data;
       setToast(resp?.message || "Registration failed");
@@ -121,25 +153,25 @@ export default function StudentRegister() {
         <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
           <div className="rounded-[2.5rem] bg-card border border-border shadow-2xl p-8 md:p-12 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-muted">
-              <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500" animate={{ width: step === 1 ? "50%" : "100%" }} />
+              <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500" animate={{ width: `${(step / 3) * 100}%` }} />
             </div>
 
             <div className="mb-10 flex justify-between items-end">
               <div>
                 <h1 className="text-3xl font-light tracking-tight text-foreground">
-                  {step === 1 ? "Create " : "Final "} 
-                  <span className="italic font-serif text-cyan-400">{step === 1 ? "Account." : "Details."}</span>
+                  {step === 1 ? "Create " : step === 2 ? "Academic " : "Profile "} 
+                  <span className="italic font-serif text-cyan-400">{step === 1 ? "Account." : step === 2 ? "Details." : "Identity."}</span>
                 </h1>
-                <p className="text-sm font-light text-foreground/60 mt-2">Step {step} of 2 — {step === 1 ? "Credentials" : "Academics"}</p>
+                <p className="text-sm font-light text-foreground/60 mt-2">Step {step} of 3 — {step === 1 ? "Credentials" : step === 2 ? "Academics" : "Profile Identity"}</p>
               </div>
-              {step === 2 && (
-                <button type="button" onClick={() => setStep(1)} className="text-xs text-foreground/40 hover:text-cyan-400 flex items-center gap-1 transition-colors">
+              {step > 1 && (
+                <button type="button" onClick={() => setStep((s) => Math.max(1, s - 1))} className="text-xs text-foreground/40 hover:text-cyan-400 flex items-center gap-1 transition-colors">
                   <ArrowLeft className="w-3 h-3" /> Back
                 </button>
               )}
             </div>
 
-            <form onSubmit={step === 1 ? nextStep : submit} className="space-y-5">
+            <form onSubmit={step === 1 ? nextStep : step === 2 ? completeAcademicsStep : submit} className="space-y-5">
               <AnimatePresence mode="wait">
                 {step === 1 ? (
                   <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-5">
@@ -207,7 +239,7 @@ export default function StudentRegister() {
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </motion.div>
-                ) : (
+                ) : step === 2 ? (
                   <motion.div key="s2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-5">
                     <div className="relative group">
                       <Building2 className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
@@ -255,6 +287,20 @@ export default function StudentRegister() {
 
                     <FileDrop label="Student ID Verification" onFile={setIdFile} />
 
+                    <Button type="submit" variant="primary" className="w-full shadow-lg">
+                      Continue to Profile Identity
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div key="s3" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-5">
+                    <UserAvatarPicker
+                      label="Step 3: Profile Identity"
+                      name={form.fullName}
+                      onChange={(file) => setProfileImageFile(file || null)}
+                      skipLabel="Skip for now"
+                      onSkip={submit}
+                    />
+
                     <Button type="submit" loading={loading} variant="primary" className="w-full shadow-lg">
                       Complete Registration
                     </Button>
@@ -274,21 +320,6 @@ export default function StudentRegister() {
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} type="error" />}
 
-      <AnimatePresence>
-        {successModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-background/60" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="relative bg-card border border-border p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full">
-              <div className="w-16 h-16 bg-cyan-500/10 text-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <h2 className="text-2xl font-light mb-3 text-foreground italic font-serif">Success.</h2>
-              <p className="text-foreground/60 text-sm mb-8 leading-relaxed font-light">Your profile has been submitted for review. Look out for an email soon.</p>
-              <Button className="w-full" onClick={() => window.location.href = "/"}>Back to Home</Button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

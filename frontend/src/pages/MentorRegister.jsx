@@ -1,10 +1,11 @@
 //frontend/src/pages/MentorRegister.jsx
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/axios";
+import { api, setAuthToken } from "../api/axios";
 import { universities, faculties, DAYS } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
+import UserAvatarPicker from "../components/UserAvatarPicker";
 import Toast from "../components/Toast";
 import ThemeToggle from "../components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -69,6 +70,7 @@ export default function MentorRegister() {
   const [selectedInstitutionKey, setSelectedInstitutionKey] = useState(null);
   const [selectedSubAreas, setSelectedSubAreas] = useState([]);
   const [socialLinks, setSocialLinks] = useState({ linkedin: '', website: '', x: '', facebook: '' });
+  const [profileImageFile, setProfileImageFile] = useState(null);
   
   const [skipAvailability, setSkipAvailability] = useState(false);
   
@@ -168,7 +170,8 @@ export default function MentorRegister() {
     );
   };
 
-  const submit = async () => {
+  const submit = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
     setLoading(true);
     try {
       const normalizedSocial = {};
@@ -190,18 +193,49 @@ export default function MentorRegister() {
         }
       });
 
-      const payload = {
-        ...form,
-        institution: selectedInstitutionKey,
-        university: selectedInstitutionKey,
-        faculty: selectedFacultyKey,
-        yearsOfExperience: Number(form.yearsOfExperience || 0),
-        expertiseAreas: selectedSubAreas,
-        socialLinks: normalizedSocial, // Now contains clean data
-        availability: skipAvailability ? [] : availability.flatMap(d => d.slots.map(({from, to}) => ({ day: d.day, from, to }))),
-      };
+      const formData = new FormData();
+      formData.append("fullName", form.fullName);
+      formData.append("email", form.email);
+      formData.append("password", form.password);
+      formData.append("institution", selectedInstitutionKey || "");
+      formData.append("university", selectedInstitutionKey || "");
+      formData.append("faculty", selectedFacultyKey || "");
+      formData.append("yearsOfExperience", String(Number(form.yearsOfExperience || 0)));
+      formData.append("bio", form.bio || "");
+      formData.append("expertiseAreas", JSON.stringify(selectedSubAreas));
+      formData.append("socialLinks", JSON.stringify(normalizedSocial));
+      formData.append(
+        "availability",
+        JSON.stringify(
+          skipAvailability
+            ? []
+            : availability.flatMap((d) => d.slots.map(({ from, to }) => ({ day: d.day, from, to })))
+        )
+      );
+      if (profileImageFile) {
+        formData.append("profileImage", profileImageFile);
+      }
 
-      await api.post("/auth/register/mentor", payload);
+      const { data } = await api.post("/auth/register/mentor", formData);
+      const user = data?.user || {};
+      if (data?.token && user?._id) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("role", user.role || "mentor");
+        localStorage.setItem("status", user.status || "pending");
+        if (user.fullName) localStorage.setItem("fullName", user.fullName);
+        localStorage.setItem("user", JSON.stringify(user));
+
+        sessionStorage.setItem("token", data.token);
+        sessionStorage.setItem("role", user.role || "mentor");
+        sessionStorage.setItem("status", user.status || "pending");
+        if (user.fullName) sessionStorage.setItem("fullName", user.fullName);
+        sessionStorage.setItem("user", JSON.stringify(user));
+
+        setAuthToken(data.token);
+        navigate("/mentor/dashboard");
+        return;
+      }
+
       setSuccessModal(true);
     } catch (err) {
       setToast(err.response?.data?.message || "Registration failed");
@@ -221,14 +255,14 @@ export default function MentorRegister() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xl mt-16">
         <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-muted">
-            <motion.div className="h-full bg-primary" animate={{ width: `${(step / 3) * 100}%` }} />
+            <motion.div className="h-full bg-primary" animate={{ width: `${(step / 4) * 100}%` }} />
           </div>
 
           <div className="mb-8">
             <h1 className="text-3xl font-light tracking-tight">
               Mentor <span className="italic font-serif text-primary">Registration.</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : "Working Hours"}</p>
+            <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : step === 3 ? "Working Hours" : "Professional Branding"}</p>
           </div>
 
           <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
@@ -429,7 +463,24 @@ export default function MentorRegister() {
 
                   <div className="flex gap-3">
                     <Button onClick={() => setStep(2)} variant="secondary" className="flex-1">Back</Button>
-                    <Button onClick={submit} loading={loading} disabled={!isStep3Valid} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Complete Registration</Button>
+                    <Button onClick={() => setStep(4)} disabled={!isStep3Valid} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Continue to Branding</Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 4 && (
+                <motion.div key="s4" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                  <UserAvatarPicker
+                    label="Step 4: Professional Branding"
+                    name={form.fullName}
+                    onChange={(file) => setProfileImageFile(file || null)}
+                    skipLabel="Skip for now"
+                    onSkip={submit}
+                  />
+
+                  <div className="flex gap-3">
+                    <Button onClick={() => setStep(3)} variant="secondary" className="flex-1">Back</Button>
+                    <Button onClick={submit} loading={loading} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Complete Registration</Button>
                   </div>
                 </motion.div>
               )}

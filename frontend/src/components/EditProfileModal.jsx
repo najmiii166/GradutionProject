@@ -4,6 +4,7 @@ import { api } from "../api/axios";
 import Spinner from "./Spinner"
 import { X, User, School, Mail, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatarPicker from "./UserAvatarPicker";
 
 export default function EditProfileModal({ user, onClose, onUpdated }) {
   const [form, setForm] = useState({
@@ -15,6 +16,9 @@ export default function EditProfileModal({ user, onClose, onUpdated }) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [profileImageChanged, setProfileImageChanged] = useState(false);
+  const [profilePreview, setProfilePreview] = useState(user.profileImageUrl || "");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,7 +45,23 @@ export default function EditProfileModal({ user, onClose, onUpdated }) {
       const { data } = await api.put("/users/profile", {
         fullName: form.fullName,
       });
-      onUpdated(data.user);
+
+      let updatedUser = data.user;
+
+      if (profileImageChanged) {
+        if (profileImageFile) {
+          const payload = new FormData();
+          payload.append("profileImage", profileImageFile);
+          const avatarResp = await api.put("/users/profile-image", payload);
+          updatedUser = avatarResp.data?.user || { ...updatedUser, profileImageUrl: avatarResp.data?.profileImageUrl || "" };
+        } else {
+          // user removed the image
+          const resp = await api.delete("/users/profile-image");
+          updatedUser = resp.data?.user || { ...updatedUser, profileImageUrl: "" };
+        }
+      }
+
+      onUpdated(updatedUser);
       onClose();
     } catch (err) {
       console.error("Profile update error:", err);
@@ -78,6 +98,17 @@ export default function EditProfileModal({ user, onClose, onUpdated }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <UserAvatarPicker
+              label="Profile Image"
+              name={form.fullName}
+              initialSrc={profilePreview}
+              onChange={(file, preview) => {
+                setProfileImageFile(file || null);
+                setProfilePreview(preview || "");
+                setProfileImageChanged(true);
+              }}
+            />
+
             {/* Email (Read Only) */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground/40 px-1">

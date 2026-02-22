@@ -16,6 +16,7 @@ import { api } from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 import useCountdown from "../../hooks/useCountdown";
 import { isJoinWindowOpen, getJoinWindowState } from "../../utils/joinWindow";
+import UserAvatar from "../UserAvatar";
 
 const isValidMeetLink = (link) =>
   /^https:\/\/meet\.google\.com\/[a-z-]+$/i.test(link);
@@ -66,9 +67,11 @@ function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh, showBadg
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex gap-3">
-          <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
-            <User size={18} />
-          </div>
+          <UserAvatar
+            src={s.studentProfileImage || ""}
+            name={s.studentName || "Student"}
+            size={40}
+          />
           <div>
             <h4 className="text-sm font-bold text-foreground/90 leading-tight">
               {s.studentName}

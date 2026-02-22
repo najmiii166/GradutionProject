@@ -209,7 +209,7 @@ router.get("/student", auth, async (req, res) => {
         populate: {
           path: "user",
           model: "User",
-          select: "fullName email university institution status role",
+          select: "fullName email university institution status role profileImageUrl",
         },
       })
       .sort({ requestedAt: -1 })
@@ -264,7 +264,7 @@ router.get("/mentor", auth, async (req, res) => {
       .populate({
         path: "studentId",
         model: "User",
-        select: "fullName email university",
+        select: "fullName email university profileImageUrl",
       })
       .sort({ requestedAt: -1 })
       .lean();
@@ -425,7 +425,7 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
       .populate({
         path: "studentId",
         model: "User",
-        select: "fullName university",
+        select: "fullName university profileImageUrl",
       })
       .sort({ requestedAt: -1 })
       .lean();
@@ -444,6 +444,7 @@ router.get("/mentor/upcoming", auth, async (req, res) => {
         studentId: s.studentId._id,
         studentName: s.studentId.fullName,
         studentUniversity: s.studentId.university,
+        studentProfileImage: s.studentId.profileImageUrl || "",
         dayOfWeek: s.slot?.day || "",
         from: s.slot?.from || "",
         to: s.slot?.to || "",

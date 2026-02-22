@@ -164,7 +164,7 @@ router.get("/requests", auth, requireRole("mentor"), async (req, res) => {
       .populate({
         path: "studentId",
         model: "User",
-        select: "fullName email university",
+        select: "fullName email university profileImageUrl",
       })
       .populate({
         path: "studentProfile",
@@ -178,6 +178,7 @@ router.get("/requests", auth, requireRole("mentor"), async (req, res) => {
       _id: r._id,
       studentId: r.studentId?._id,
       studentName: r.studentId?.fullName || "Student",
+      studentImage: r.studentId?.profileImageUrl || "",
       studentUniversity: r.studentId?.university || "—",
       major: r.studentProfile?.major || "",
       semester: r.studentProfile?.semester || "",
@@ -231,7 +232,7 @@ router.get("/students/:id", auth, requireRole("mentor"), async (req, res) => {
     console.log("Fetching student:", studentId);
 
     const studentProfile = await StudentProfile.findOne({ user: studentId })
-      .populate("user", "fullName email university")
+      .populate("user", "fullName email university profileImageUrl")
       .lean();
 
     if (!studentProfile) {
@@ -241,6 +242,7 @@ router.get("/students/:id", auth, requireRole("mentor"), async (req, res) => {
     return res.json({
       fullName: studentProfile.user?.fullName || "Unknown",
       email: studentProfile.user?.email || "",
+      profileImageUrl: studentProfile.user?.profileImageUrl || "",
       university: studentProfile.user?.university || "",
       major: studentProfile.major || "",
       semester: studentProfile.semester || "",
@@ -262,7 +264,7 @@ router.get("/mentors/:id", auth, requireRole("student"), async (req, res) => {
     const mentorId = req.params.id;
 
     const mentorProfile = await MentorProfile.findOne({ user: mentorId })
-      .populate("user", "fullName email university")
+      .populate("user", "fullName email university profileImageUrl")
       .lean();
 
     if (!mentorProfile) {
@@ -273,6 +275,7 @@ router.get("/mentors/:id", auth, requireRole("student"), async (req, res) => {
       userId: mentorProfile.user?._id,
       fullName: mentorProfile.user?.fullName || "Unknown",
       email: mentorProfile.user?.email || "",
+      profileImageUrl: mentorProfile.user?.profileImageUrl || "",
       university: mentorProfile.user?.university || "",
       institution: mentorProfile.institution || "",
       faculty: mentorProfile.faculty || "",

@@ -2,14 +2,30 @@
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const uploadsRoot = path.join(__dirname, "..", "..", "uploads");
+
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+const idcardsDir = path.join(uploadsRoot, "idcards");
+const chatDir = path.join(uploadsRoot, "chat");
+const avatarsDir = path.join(uploadsRoot, "avatars");
+
+ensureDir(idcardsDir);
+ensureDir(chatDir);
+ensureDir(avatarsDir);
 
 // ---------------- ID CARD UPLOAD (existing) ----------------
 const idStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "..", "..", "uploads", "idcards"));
+    cb(null, idcardsDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || ".jpg";
@@ -20,7 +36,7 @@ const idStorage = multer.diskStorage({
   },
 });
 
-const fileFilter = (req, file, cb) => {
+const imageFileFilter = (req, file, cb) => {
   // Allow common image types plus SVG for ID cards (SVG used by some uploads)
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
   const ok = allowed.includes(file.mimetype);
@@ -29,14 +45,49 @@ const fileFilter = (req, file, cb) => {
 
 export const uploadIdCard = multer({
   storage: idStorage,
-  fileFilter,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, avatarsDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const safeName = `avatar-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+    cb(null, safeName);
+  },
+});
+
+export const uploadProfileImage = multer({
+  storage: avatarStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const registrationIdentityStorage = multer.diskStorage({
+  destination: (_req, file, cb) => {
+    const target = file.fieldname === "idCard" ? idcardsDir : avatarsDir;
+    cb(null, target);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const prefix = file.fieldname === "idCard" ? "id" : "avatar";
+    cb(null, `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
+
+export const uploadIdentityAssets = multer({
+  storage: registrationIdentityStorage,
+  fileFilter: imageFileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 // ---------------- CHAT ATTACHMENT UPLOAD (NEW) ----------------
 const chatStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "..", "..", "uploads", "chat"));
+    cb(null, chatDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || "";

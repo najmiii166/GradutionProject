@@ -110,7 +110,7 @@ router.get("/history/mentor", auth, async (req, res) => {
       .populate({
         path: "studentId",
         model: "User",
-        select: "fullName university",
+        select: "fullName university profileImageUrl",
       })
       .sort({ startTime: -1 })
       .lean();
@@ -159,7 +159,7 @@ router.get("/history/student", auth, async (req, res) => {
         populate: {
           path: "user",
           model: "User",
-          select: "fullName",
+          select: "fullName profileImageUrl",
         },
       })
       .sort({ startTime: -1 })

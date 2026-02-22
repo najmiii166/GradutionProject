@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Brand from "../Brand";
 import ChatNotificationBadge from "../ChatNotificationBadge";
+import UserAvatar from "../UserAvatar";
 
 export default function MentorSidebar({ 
   activeTab, 
@@ -18,6 +19,7 @@ export default function MentorSidebar({
   onGoUpcoming,
   onGoHome,
 }) {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   // 1. Theme Logic
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -134,19 +136,6 @@ export default function MentorSidebar({
 
       {/* 3. BOTTOM ACTIONS */}
       <div className="flex flex-col items-center gap-6 pb-2">
-        
-        {/* Theme Toggle */}
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className="p-3 rounded-2xl text-sidebar-foreground/50 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground transition-all"
-        >
-          {isDark ? (
-            <Sun size={20} className="text-orange-400" />
-          ) : (
-            <Moon size={20} className="text-cyan-500" />
-          )}
-        </button>
-
         {/* Logout (Red Style) */}
         <button
           onClick={handleLogout}
