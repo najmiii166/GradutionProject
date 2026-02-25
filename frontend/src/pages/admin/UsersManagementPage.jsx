@@ -1,10 +1,22 @@
 // frontend/src/pages/admin/UsersManagementPage.jsx
 import { motion } from "framer-motion";
 import { UserCheck, ShieldAlert, Search, Mail, Calendar, GraduationCap } from "lucide-react";
+import { useMemo, useState } from "react";
 import { universities } from "../../constants/systemData";
 import UserAvatar from "../../components/UserAvatar";
 
 export default function UsersManagementPage({ users, loading, view, setView, handleUnverify, handleVerify }) {
+  const [query, setQuery] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    if (!query || !users) return users || [];
+    const q = query.trim().toLowerCase();
+    return (users || []).filter((u) => {
+      const name = (u.fullName || "").toLowerCase();
+      const email = (u.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [query, users]);
   return (
     <section className="p-4 md:p-8 flex flex-col gap-6 max-w-[1600px] mx-auto min-h-screen">
       
@@ -40,8 +52,10 @@ export default function UsersManagementPage({ users, loading, view, setView, han
         {/* Search Bar - Matches the premium input style */}
         <div className="relative w-full lg:w-96 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/30 group-focus-within:text-cyan-500 transition-colors" />
-          <input 
+          <input
             type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name or email..."
             className="w-full bg-card border border-border/50 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/5 transition-all"
           />
@@ -75,7 +89,7 @@ export default function UsersManagementPage({ users, loading, view, setView, han
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {users.map((u, i) => (
+                {filteredUsers.map((u, i) => (
                   <motion.tr 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}

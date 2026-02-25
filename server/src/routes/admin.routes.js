@@ -233,6 +233,8 @@ router.get('/reports/drilldown/students', auth, requireRole('admin'), async (req
         { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
       ];
+      // Only include verified users
+      pipeline.push({ $match: { 'user.status': 'verified' } });
       if (s || e) pipeline.push({ $match: (() => { const m = {}; if (s || e) m['user.createdAt'] = {}; if (s) m['user.createdAt'].$gte = s; if (e) m['user.createdAt'].$lte = e; return Object.keys(m).length ? m : {}; })() });
       pipeline.push({ $unwind: { path: '$mentorshipAreas', preserveNullAndEmptyArrays: true } });
       pipeline.push({ $group: { _id: '$mentorshipAreas', count: { $sum: 1 } } });
@@ -608,6 +610,12 @@ router.post(
       }
 
       res.json({ message: "User approved", user, emailStatus });
+      try {
+        const io = req.app && req.app.get && req.app.get('io');
+        if (io) io.emit('admin:refresh', { type: 'user_status_change', action: 'approved', userId: String(user._id) });
+      } catch (e) {
+        console.warn('Failed to emit admin:refresh (approve)', e);
+      }
     } catch (err) {
       console.error("Approve user error:", err);
       res.status(500).json({ message: "Failed to approve user" });
@@ -646,6 +654,12 @@ router.post(
       }
 
       res.json({ message: "User moved to unverified", user, emailStatus });
+      try {
+        const io = req.app && req.app.get && req.app.get('io');
+        if (io) io.emit('admin:refresh', { type: 'user_status_change', action: 'unverified', userId: String(user._id) });
+      } catch (e) {
+        console.warn('Failed to emit admin:refresh (unverify)', e);
+      }
     } catch (err) {
       console.error("Unverify user error:", err);
       res.status(500).json({ message: "Failed to unverify user" });
@@ -687,6 +701,12 @@ router.post(
       await User.deleteOne({ _id: user._id });
 
       res.json({ message: "User rejected and removed", emailStatus });
+      try {
+        const io = req.app && req.app.get && req.app.get('io');
+        if (io) io.emit('admin:refresh', { type: 'user_status_change', action: 'rejected', userId: String(user._id) });
+      } catch (e) {
+        console.warn('Failed to emit admin:refresh (reject)', e);
+      }
     } catch (err) {
       console.error("Reject user error:", err);
       res.status(500).json({ message: "Failed to reject user" });
@@ -698,15 +718,21 @@ router.post(
 // Only data actually used in the dashboard: studentMajors & studentUniversities
 router.get("/analytics", auth, requireRole("admin"), async (req, res) => {
   try {
-    // Aggregate by student major (legacy) -- keep for backward compatibility
+    // Aggregate by student major (legacy) -- only verified students
     const studentMajors = await safeAggregate(StudentProfile, [
-      { $group: { _id: { $ifNull: ["$major", "Unknown"] }, count: { $sum: 1 } } },
+      { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $match: { 'user.status': 'verified' } },
+      { $group: { _id: { $ifNull: ['$major', 'Unknown'] }, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
-    // Aggregate by faculty (canonical field) for Department Distribution chart
+    // Aggregate by faculty (canonical field) for Department Distribution chart -- only verified students
     const studentFaculties = await safeAggregate(StudentProfile, [
-      { $group: { _id: { $ifNull: ["$faculty", "Unknown"] }, count: { $sum: 1 } } },
+      { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $match: { 'user.status': 'verified' } },
+      { $group: { _id: { $ifNull: ['$faculty', 'Unknown'] }, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
@@ -717,14 +743,91 @@ router.get("/analytics", auth, requireRole("admin"), async (req, res) => {
       { $sort: { count: -1 } },
     ]);
 
+    // Mentors per institution (MentorProfile.institution) - only verified users
+    const mentorInstitutions = await safeAggregate(MentorProfile, [
+      { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $match: { 'user.status': 'verified' } },
+      { $group: { _id: { $ifNull: ['$institution', 'Unknown'] }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Merge students and mentors into universityStats
+    const mentorMap = new Map(mentorInstitutions.map(m => [String(m._id || 'Unknown'), m.count]));
+    const universityStats = [];
+
+    // include student entries
+    studentUniversities.forEach(s => {
+      const key = String(s._id || 'Unknown');
+      universityStats.push({ university: key, students: s.count || 0, mentors: mentorMap.get(key) || 0 });
+    });
+
+    // include mentor-only institutions
+    mentorInstitutions.forEach(m => {
+      const key = String(m._id || 'Unknown');
+      if (!universityStats.find(u => String(u.university) === key)) {
+        universityStats.push({ university: key, students: 0, mentors: m.count || 0 });
+      }
+    });
+
+    // sort by total (students + mentors)
+    universityStats.sort((a, b) => ((b.students || 0) + (b.mentors || 0)) - ((a.students || 0) + (a.mentors || 0)));
+
     res.json({
       studentMajors,
       studentFaculties,
       studentUniversities,
+      universityStats,
     });
   } catch (err) {
     console.error("Analytics error:", err);
     res.status(500).json({ message: "Failed to load analytics" });
+  }
+});
+
+// ================== TOP MENTORS BY SESSION STATUS ==================
+// Returns two lists: topCompleted and topExpired (by counts)
+router.get('/reports/top-mentor-sessions', auth, requireRole('admin'), async (req, res) => {
+  try {
+    const topN = parseInt(req.query.top || '8', 10);
+
+    // Top mentors by completed sessions
+    const completedPipeline = [
+      { $match: { status: 'completed' } },
+      { $group: { _id: '$mentorId', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: topN },
+      { $lookup: { from: 'mentorprofiles', localField: '_id', foreignField: '_id', as: 'mentorProfile' } },
+      { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'users', localField: 'mentorProfile.user', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $match: { 'user.status': 'verified' } },
+      { $project: { mentorProfileId: '$_id', userId: '$user._id', count: 1, name: '$user.fullName', email: '$user.email' } }
+    ];
+
+    // Top mentors by expired sessions
+    const expiredPipeline = [
+      { $match: { status: 'expired' } },
+      { $group: { _id: '$mentorId', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: topN },
+      { $lookup: { from: 'mentorprofiles', localField: '_id', foreignField: '_id', as: 'mentorProfile' } },
+      { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'users', localField: 'mentorProfile.user', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $match: { 'user.status': 'verified' } },
+      { $project: { mentorProfileId: '$_id', userId: '$user._id', count: 1, name: '$user.fullName', email: '$user.email' } }
+    ];
+
+    const [topCompleted, topExpired] = await Promise.all([
+      Request.aggregate(completedPipeline).allowDiskUse(true),
+      Request.aggregate(expiredPipeline).allowDiskUse(true),
+    ]);
+
+    return res.json({ topCompleted, topExpired });
+  } catch (err) {
+    console.error('Top mentor sessions error:', err);
+    return res.status(500).json({ message: 'Failed to compute top mentor sessions' });
   }
 });
 

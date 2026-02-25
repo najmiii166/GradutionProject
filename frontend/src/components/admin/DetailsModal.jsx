@@ -16,6 +16,7 @@ export default function DetailsModal({
   closeDetails,
   handleApprove,
   handleReject,
+  handleUnverify,
 }) {
   const getFacultyName = (key) => {
     return faculties.find(f => f.key === key)?.name || key || "—";
@@ -200,22 +201,38 @@ export default function DetailsModal({
 
         {/* Footer */}
         <div className="px-8 py-6 border-t border-border/50 bg-foreground/[0.01] flex justify-end gap-3">
-          <Button
-            variant="ghost"
-            className="flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-2xl transition-all active:scale-95"
-            onClick={() => handleReject(modalUser._id)}
-          >
-            <X size={14} />
-            Reject
-          </Button>
-          <Button
-            variant="Brand"
-            className="flex items-center gap-2 px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-2xl shadow-xl shadow-cyan-500/10 transition-all active:scale-95"
-            onClick={() => handleApprove(modalUser._id)}
-          >
-            <CheckCircle size={14} />
-            Approve User
-          </Button>
+          {modalUser?.status === 'pending' ? (
+            <>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-2xl transition-all active:scale-95"
+                onClick={() => handleReject(modalUser._id)}
+              >
+                <X size={14} />
+                Reject
+              </Button>
+              <Button
+                variant="Brand"
+                className="flex items-center gap-2 px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-2xl shadow-xl shadow-cyan-500/10 transition-all active:scale-95"
+                onClick={() => handleApprove(modalUser._id)}
+              >
+                <CheckCircle size={14} />
+                Approve User
+              </Button>
+            </>
+          ) : (
+            // For non-pending users: only show Unverify if the user is NOT already verified
+            (modalUser?.status && modalUser.status !== 'verified') ? (
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 px-6 py-3 border border-border text-foreground hover:bg-foreground/5 rounded-2xl transition-all active:scale-95"
+                onClick={() => handleUnverify && handleUnverify(modalUser._id)}
+              >
+                <X size={14} />
+                Unverify
+              </Button>
+            ) : null
+          )}
         </div>
       </motion.div>
     </div>

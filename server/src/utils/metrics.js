@@ -109,7 +109,11 @@ export async function getGlobalMetrics({ start = null, end = null } = {}) {
   const mentorPendingByMentor = (pendingByMentorAgg || []).map((t) => ({ name: t.name || "Unknown", pending: t.pending || 0 }));
 
   // top student majors (by student profiles)
+  // top student majors (by student profiles) — only verified students
   const majorsAgg = await safeAggregate(StudentProfile, [
+    { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } },
+    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    { $match: { 'user.status': 'verified' } },
     { $unwind: { path: "$mentorshipAreas", preserveNullAndEmptyArrays: true } },
     { $group: { _id: "$mentorshipAreas", count: { $sum: 1 } } },
     { $sort: { count: -1 } },

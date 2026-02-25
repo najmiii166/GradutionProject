@@ -232,13 +232,18 @@ export default function MentorRegister() {
         sessionStorage.setItem("user", JSON.stringify(user));
 
         setAuthToken(data.token);
-        navigate("/mentor/dashboard");
-        return;
       }
 
+      // Always show success modal informing admin will review and email the user
       setSuccessModal(true);
     } catch (err) {
-      setToast(err.response?.data?.message || "Registration failed");
+      const resp = err.response?.data;
+      if (resp?.errors && Array.isArray(resp.errors)) {
+        const msgs = resp.errors.map((e) => e.msg || e.msg || JSON.stringify(e)).join("; ");
+        setToast(msgs || "Validation failed");
+      } else {
+        setToast(resp?.message || "Registration failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -262,7 +267,7 @@ export default function MentorRegister() {
             <h1 className="text-3xl font-light tracking-tight">
               Mentor <span className="italic font-serif text-primary">Registration.</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : step === 3 ? "Working Hours" : "Professional Branding"}</p>
+            <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : step === 3 ? "Working Hours" : "Profile Picture"}</p>
           </div>
 
           <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
@@ -463,7 +468,7 @@ export default function MentorRegister() {
 
                   <div className="flex gap-3">
                     <Button onClick={() => setStep(2)} variant="secondary" className="flex-1">Back</Button>
-                    <Button onClick={() => setStep(4)} disabled={!isStep3Valid} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Continue to Branding</Button>
+                    <Button onClick={() => setStep(4)} disabled={!isStep3Valid} variant="primary" className="flex-[2] shadow-xl shadow-primary/20">Continue to Profile Identity</Button>
                   </div>
                 </motion.div>
               )}
@@ -471,7 +476,7 @@ export default function MentorRegister() {
               {step === 4 && (
                 <motion.div key="s4" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
                   <UserAvatarPicker
-                    label="Step 4: Professional Branding"
+                    label="Step 4: Profile Picture"
                     name={form.fullName}
                     onChange={(file) => setProfileImageFile(file || null)}
                     skipLabel="Skip for now"
@@ -496,8 +501,8 @@ export default function MentorRegister() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card border border-border p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full">
               <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-8 h-8" /></div>
-              <h2 className="text-2xl font-light italic font-serif mb-2">Registration Successful!</h2>
-              <p className="text-muted-foreground text-sm mb-8">Your account has been created. Admin will verify your credentials soon.</p>
+              <h2 className="text-2xl font-light italic font-serif mb-2">Registration Submitted</h2>
+              <p className="text-muted-foreground text-sm mb-8">Administrator will review your information and you will receive an email update once the review is complete.</p>
               <Button className="w-full" onClick={() => navigate("/")}>Go to Home</Button>
             </motion.div>
           </div>

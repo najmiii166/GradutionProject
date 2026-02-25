@@ -84,6 +84,16 @@ router.get("/mentor/:id", auth, async (req, res) => {
       await Request.findByIdAndUpdate(u.id, { status: u.status });
     }
 
+    // Emit admin refresh if any sessions changed status so dashboard updates
+    try {
+      if (toUpdate.length) {
+        const io = req.app && req.app.get && req.app.get('io');
+        if (io) io.emit('admin:refresh', { type: 'sessions_updated', updates: toUpdate.map(t => ({ id: String(t.id), status: t.status })) });
+      }
+    } catch (e) {
+      console.warn('Failed to emit admin:refresh (sessions update)', e);
+    }
+
     res.json({ success: true, sessions: result });
   } catch (err) {
     console.error("Sessions fetch error:", err);

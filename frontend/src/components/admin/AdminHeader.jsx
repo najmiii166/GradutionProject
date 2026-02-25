@@ -8,28 +8,28 @@ export default function AdminHeader({ activePage }) {
         return {
           title: "Platform",
           highlight: "Overview.",
-          subtitle: "Summary of analytics and platform statistics.",
+          
         };
       case "pending":
         return {
           title: "Awaiting",
           highlight: "Approval.",
-          subtitle: "Review student and mentor account requests.",
+          
         };
       case "reports":
         return {
           title: "System",
           highlight: "Reports.",
-          subtitle: "Analyze performance and feedback data.",
+          
         };
       case "users":
         return {
           title: "User",
           highlight: "Management.",
-          subtitle: "Manage and monitor all platform participants.",
+          
         };
       default:
-        return { title: "Admin", highlight: "Panel.", subtitle: "" };
+        return { title: "Admin", highlight: "Panel." };
     }
   };
 
@@ -51,7 +51,7 @@ export default function AdminHeader({ activePage }) {
 
           {/* Main Title with your signature serif style */}
           <h1 className="text-2xl md:text-3xl font-light tracking-tight text-foreground">
-            {title} <span className="italic font-serif text-cyan-500/80">{highlight}</span>
+            {title} <span className="text-2xl md:text-3xlfont-semibold text-cyan-500/80">{highlight}</span>
           </h1>
 
           {/* Subtitle */}

@@ -48,12 +48,17 @@ export default function Login() {
       setAuthToken(data.token);
       setToast("Logged in successfully ✨");
 
-      if (role === "admin") window.location.href = "/admin";
-      else if (role === "student")
-        window.location.href = status === "verified" ? "/student/dashboard" : "/";
-      else if (role === "mentor")
-        window.location.href = status === "verified" ? "/mentor/dashboard" : "/";
-      else window.location.href = "/";
+      if (role === "admin") {
+        window.location.href = "/admin";
+      } else if (role === "student") {
+        if (status === "verified") window.location.href = "/student/dashboard";
+        else window.location.href = `/account-status?role=student&status=${encodeURIComponent(status)}`;
+      } else if (role === "mentor") {
+        if (status === "verified") window.location.href = "/mentor/dashboard";
+        else window.location.href = `/account-status?role=mentor&status=${encodeURIComponent(status)}`;
+      } else {
+        window.location.href = "/";
+      }
     } catch (err) {
       console.error("Login error:", err);
       setToast(err.response?.data?.message || "Login failed");

@@ -146,6 +146,14 @@ router.post("/register/mentor", uploadProfileImage.single("profileImage"), mento
     });
 
     const token = signToken(user);
+    // Emit admin refresh so dashboards update in real-time
+    try {
+      const io = req.app && req.app.get && req.app.get('io');
+      if (io) io.emit('admin:refresh', { type: 'user_registered', role: 'mentor', userId: String(user._id) });
+    } catch (e) {
+      console.warn('Failed to emit admin:refresh (mentor register)', e);
+    }
+
     res.status(201).json({
       message: "Mentor registered. Await admin verification.",
       token,
@@ -240,6 +248,14 @@ router.post(
     });
 
     const token = signToken(user);
+    // Emit admin refresh so dashboards update in real-time
+    try {
+      const io = req.app && req.app.get && req.app.get('io');
+      if (io) io.emit('admin:refresh', { type: 'user_registered', role: 'student', userId: String(user._id) });
+    } catch (e) {
+      console.warn('Failed to emit admin:refresh (student register)', e);
+    }
+
     res.status(201).json({
       message: "Student registered. Await admin verification.",
       idCardUrl,

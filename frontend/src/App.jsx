@@ -30,6 +30,7 @@
   import ReportView from "./pages/ReportView";
   import HistoryPage from "./pages/HistoryPage";
   import About from "./pages/About";
+  import AccountStatus from "./pages/AccountStatus";
   
 
 
@@ -103,6 +104,7 @@
 
             {/* About */}
             <Route path="/about" element={<About />} />
+            <Route path="/account-status" element={<AccountStatus />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />

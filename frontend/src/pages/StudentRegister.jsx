@@ -38,6 +38,7 @@ export default function StudentRegister() {
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [successModal, setSuccessModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isTypingPassword, setIsTypingPassword] = useState(false);
   const [selectedUniKey, setSelectedUniKey] = useState(null);
@@ -129,7 +130,8 @@ export default function StudentRegister() {
     try {
       const resp = await api.post("/auth/register/student", data);
       persistAuth(resp.data);
-      navigate("/student/dashboard");
+      // Show success modal informing admin will review and email the user
+      setSuccessModal(true);
     } catch (err) {
       const resp = err.response?.data;
       setToast(resp?.message || "Registration failed");
@@ -319,6 +321,22 @@ export default function StudentRegister() {
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} type="error" />}
+
+      <AnimatePresence>
+        {successModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card border border-border p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full">
+              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-8 h-8" /></div>
+              <h2 className="text-2xl font-light italic font-serif mb-2">Registration Submitted</h2>
+              <p className="text-foreground/60 text-sm mb-6">Your registration is received — an administrator will review your information and you will receive an email update.</p>
+              <div className="flex gap-3">
+                <button className="flex-1 rounded-xl px-4 py-2 border border-border" onClick={() => { setSuccessModal(false); }}>Stay</button>
+                <a href="/" className="flex-[2] rounded-xl px-4 py-2 bg-primary text-white">Go to Home</a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
