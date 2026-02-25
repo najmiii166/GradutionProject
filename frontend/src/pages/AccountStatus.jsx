@@ -10,7 +10,6 @@ export default function AccountStatus() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const role = params.get("role") || "user";
   const status = (params.get("status") || "pending").toLowerCase();
 
   const config = {
@@ -63,8 +62,6 @@ export default function AccountStatus() {
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <Button onClick={() => navigate('/')} variant="primary">Go to Home</Button>
-                <div className="mt-2 sm:mt-0 ml-0 sm:ml-6 text-sm text-foreground/50 whitespace-nowrap hidden md:block">Role: <strong>{role}</strong> • Status: <strong className="capitalize">{status}</strong></div>
-                <div className="mt-2 text-sm text-foreground/50 md:hidden">Role: <strong>{role}</strong> • Status: <strong className="capitalize">{status}</strong></div>
               </div>
             </div>
           </div>
