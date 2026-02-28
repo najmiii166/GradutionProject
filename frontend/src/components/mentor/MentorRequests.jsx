@@ -42,7 +42,6 @@ export default function MentorRequests({
 }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [summaries, setSummaries] = useState({}); // { [requestId]: { loading, error, data } }
-  const [summaryLang, setSummaryLang] = useState("en");
   // AI Analyze removed: no toast needed here
 
   useEffect(() => {
@@ -216,15 +215,26 @@ export default function MentorRequests({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto"
+            onMouseDown={(e) => {
+              // Do not close or trigger any actions when clicking outside the modal
+              if (e.target === e.currentTarget) e.preventDefault();
+            }}
+            onClick={(e) => {
+              // Explicitly ignore backdrop clicks
+              if (e.target === e.currentTarget) e.stopPropagation();
+            }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="w-full max-w-xl bg-card border border-border/50 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden"
+              className="w-full max-w-xl bg-card border border-border/50 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden pointer-events-auto"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
                 onClick={() => setSelectedRequest(null)}
                 className="absolute top-6 right-6 p-2 rounded-xl hover:bg-foreground/5 text-foreground/30 transition-colors"
               >
@@ -283,124 +293,69 @@ export default function MentorRequests({
                   {selectedRequest.questionnaire?.sessionGoal || "General Guidance."}
                 </Section>
 
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-foreground/30 px-1">AI Summary</p>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={summaryLang}
-                      onChange={(e) => setSummaryLang(e.target.value)}
-                      className="text-[10px] px-2 py-1 rounded-lg bg-foreground/3 border border-border/50 text-foreground/70"
-                    >
-                      <option value="en">English</option>
-                      <option value="so">Somali</option>
-                    </select>
-                    <button
-                    className="px-3 py-1.5 rounded-xl bg-foreground text-background text-[10px] font-bold uppercase tracking-widest hover:bg-cyan-500 hover:text-white transition-all"
-                    onClick={async () => {
-                      const id = selectedRequest._id;
-                      setSummaries((prev) => ({ ...prev, [id]: { ...(prev[id]||{}), loading: true, error: "" } }));
-                      try {
-                        if (!summaries[id]?.data) {
-                          const { data } = await api.get(`/mentor/requests/${id}/ai-summary`, { params: { lang: summaryLang } });
-                          setSummaries((prev) => ({ ...prev, [id]: { loading: false, error: "", data } }));
-                        } else {
-                          setSummaries((prev) => ({ ...prev, [id]: { ...prev[id], loading: false } }));
-                        }
-                      } catch (err) {
-                        const status = err?.response?.status;
-                        const msg = err?.response?.data?.message || "Failed to load summary.";
-                        const errorText = status === 429 ? "You're asking too fast, please wait." : msg;
-                        setSummaries((prev) => ({ ...prev, [id]: { loading: false, error: errorText, data: prev[id]?.data } }));
-                      }
-                    }}
-                  >
-                    {summaries[selectedRequest._id]?.loading ? "Loading..." : (summaries[selectedRequest._id]?.data ? "Refresh" : "AI Summary")}
-                  </button>
-                  </div>
-                </div>
-
-                {summaries[selectedRequest._id]?.error && (
-                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest px-1">{summaries[selectedRequest._id].error}</p>
-                )}
-
-                {summaries[selectedRequest._id]?.data && (
-                  <div className="space-y-2">
-                    <div className="text-[13px] text-foreground/70 bg-foreground/[0.02] border border-border/40 rounded-2xl p-4 leading-relaxed">
-                      {summaries[selectedRequest._id].data.summary}
-                    </div>
-                    <div className="grid grid-cols-1 gap-2">
-                      {(summaries[selectedRequest._id].data.keyPoints || []).map((kp, i) => (
-                        <div key={i} className="px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-[11px] text-foreground/70">
-                          • {kp}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-foreground/40 px-1">
-                      <span className="font-black">Difficulty:</span>
-                      <span className="font-bold text-foreground/60">{summaries[selectedRequest._id].data.difficulty}</span>
-                    </div>
-                    {/* Suggested Agenda removed per request */}
-                  </div>
-                )}
               </div>
 
               {/* AI Summary */}
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm font-medium text-slate-300">AI Summary</p>
-                <button
-                  onClick={async () => {
-                    const id = selectedRequest._id;
-                    const state = summaries[id] || { loading: false };
-                    if (state.loading || state.data) return; // cached or loading
-                    setSummaries((prev) => ({ ...prev, [id]: { loading: true } }));
-                    try {
-                      const { data } = await api.get(`/mentor/requests/${id}/ai-summary`);
-                      const payload = data?.data || null;
-                      setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: payload, error: null } }));
-                    } catch (err) {
-                      const msg = err?.response?.data?.message || "Failed to load AI summary";
-                      setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: null, error: msg } }));
-                    }
-                  }}
-                  className="text-xs px-3 py-1 rounded-md border border-slate-700 hover:border-sky-500 text-slate-200"
-                >
-                  {(summaries[selectedRequest._id]?.loading) ? "Loading…" : (summaries[selectedRequest._id]?.data ? "Loaded" : "AI Summary")}
-                </button>
-              </div>
+              {(() => {
+                const state = summaries[selectedRequest._id] || {};
+                const isLoading = Boolean(state.loading);
+                const isLoaded = Boolean(state.data);
 
-              {summaries[selectedRequest._id]?.error && (
-                <div className="mt-2 text-xs text-rose-400">{summaries[selectedRequest._id].error}</div>
-              )}
-
-              {summaries[selectedRequest._id]?.data && (
-                <div className="mt-2 rounded-lg bg-slate-900/60 border border-slate-800 p-3">
-                  <p className="text-sm text-slate-300">{summaries[selectedRequest._id].data.summary}</p>
-
-                  {Array.isArray(summaries[selectedRequest._id].data.keyPoints) && summaries[selectedRequest._id].data.keyPoints.length > 0 && (
-                    <ul className="mt-2 list-disc list-inside text-sm text-slate-300">
-                      {summaries[selectedRequest._id].data.keyPoints.map((kp, i) => (
-                        <li key={i}>{kp}</li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <div className="mt-2 text-[12px] text-slate-400">Difficulty: <span className="text-slate-200">{summaries[selectedRequest._id].data.difficulty}</span></div>
-
-                  {Array.isArray(summaries[selectedRequest._id].data.suggestedAgenda) && summaries[selectedRequest._id].data.suggestedAgenda.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-slate-200">Suggested Agenda</p>
-                      <ul className="mt-1 list-disc list-inside text-sm text-slate-300">
-                        {summaries[selectedRequest._id].data.suggestedAgenda.map((item, idx) => (
-                          <li key={idx}>{item}</li>
-                        ))}
-                      </ul>
+                return (
+                  <>
+                    <div className="flex items-center justify-between mt-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-foreground/30 px-1">AI Summary</p>
+                      <button
+                        type="button"
+                        disabled={isLoading || isLoaded}
+                        onClick={async () => {
+                          const id = selectedRequest._id;
+                          const current = summaries[id] || { loading: false };
+                          if (current.loading || current.data) return; // cached or loading
+                          setSummaries((prev) => ({ ...prev, [id]: { loading: true, data: null, error: null } }));
+                          try {
+                            const { data } = await api.get(`/mentor/requests/${id}/ai-summary`);
+                            const payload = data?.data || null;
+                            setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: payload, error: null } }));
+                          } catch (err) {
+                            const msg = err?.response?.data?.message || "Failed to load AI summary";
+                            setSummaries((prev) => ({ ...prev, [id]: { loading: false, data: null, error: msg } }));
+                          }
+                        }}
+                        className="text-[10px] px-3 py-1.5 rounded-xl border border-border bg-card text-foreground/80 font-bold uppercase tracking-widest hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? "Loading…" : (isLoaded ? "Loaded" : "AI Summary")}
+                      </button>
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {state.error && (
+                      <div className="mt-2 text-[10px] text-rose-500 font-bold uppercase tracking-widest px-1">{state.error}</div>
+                    )}
+
+                    {state.data && (
+                      <div className="mt-2 rounded-2xl bg-foreground/[0.02] border border-border/40 p-4">
+                        <p className="text-sm text-foreground/80 leading-relaxed">{state.data.summary}</p>
+
+                        {Array.isArray(state.data.keyPoints) && state.data.keyPoints.length > 0 && (
+                          <ul className="mt-3 space-y-1 text-sm text-foreground/70">
+                            {state.data.keyPoints.map((kp, i) => (
+                              <li key={i} className="leading-relaxed">• {kp}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="mt-3 text-[10px] uppercase tracking-widest text-foreground/40">
+                          Difficulty: <span className="font-bold text-foreground/70">{state.data.difficulty}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="flex justify-end gap-3 mt-6">
                 <button
+                  type="button"
                   onClick={() => {
                     onAction(selectedRequest._id, "reject");
                     setSelectedRequest(null);
@@ -411,6 +366,7 @@ export default function MentorRequests({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => {
                     onAction(selectedRequest._id, "accept");
                     setSelectedRequest(null);
