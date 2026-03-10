@@ -3,6 +3,7 @@ import StudentProfile from "../models/StudentProfile.js";
 import MentorProfile from "../models/MentorProfile.js";
 import { auth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
+import { getMentorRatingSummaryMap } from "../utils/mentorRatings.js";
 
 const router = express.Router();
 
@@ -32,11 +33,19 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
       .populate("user", "fullName university status role profileImageUrl")
       .lean();
 
+    const ratingSummaryMap = await getMentorRatingSummaryMap(mentorProfiles.map((item) => item._id));
+
     // Include only verified mentors and relevant fields
     const mentors = mentorProfiles
       .filter((m) => m.user?.status === "verified" && m.user?.role === "mentor")
       .map((m) => {
         const user = m.user ? { ...m.user } : null;
+        const ratingSummary = ratingSummaryMap.get(String(m._id)) || {
+          averageRating: Number(m.averageRating || 0),
+          totalRatings: Number(m.totalRatings || 0),
+          percentPositive: 0,
+          badge: "—",
+        };
         if (user && (!user.university || user.university === "")) {
           user.university = m.institution || "";
         }
@@ -52,19 +61,10 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
           expertiseAreas: m.expertiseAreas,
           availability: m.availability || [],
           // rating metadata
-          averageRating: m.averageRating || 0,
-          totalRatings: m.totalRatings || 0,
-          percentPositive: (() => {
-            try {
-              const arr = m.ratings || [];
-              if (!arr.length) return 0;
-              const ok = arr.filter((r) => (r.score || 0) >= 4).length;
-              return Math.round((ok / arr.length) * 100);
-            } catch (e) {
-              return 0;
-            }
-          })(),
-          badge: m.averageRating ? (m.badge || "—") : "—",
+          averageRating: ratingSummary.averageRating,
+          totalRatings: ratingSummary.totalRatings,
+          percentPositive: ratingSummary.percentPositive,
+          badge: ratingSummary.badge,
         };
       });
 
@@ -79,7 +79,7 @@ router.get("/matches", auth, requireRole("student"), async (req, res) => {
    UPDATE STUDENT PROFILE (post-approval)
    Allows a verified student to complete or edit their profile
    PUT /api/student/profile
-   body (json): { faculty, major, semester, mentorshipAreas, about, idCardUrl }
+  body (json): { faculty, major, semester, mentorshipAreas, about }
 ======================================================= */
 router.put("/profile", auth, requireRole("student"), async (req, res) => {
   try {
@@ -88,7 +88,7 @@ router.put("/profile", auth, requireRole("student"), async (req, res) => {
       return res.status(403).json({ message: "Profile completion allowed only after verification." });
     }
 
-    const { faculty, major, semester, mentorshipAreas, about, idCardUrl } = req.body;
+    const { faculty, major, semester, mentorshipAreas, about } = req.body;
 
     // normalize mentorshipAreas: accept array, JSON-string, or CSV
     let areas = [];
@@ -109,7 +109,6 @@ router.put("/profile", auth, requireRole("student"), async (req, res) => {
       ...(major ? { major } : {}),
       ...(semester ? { semester } : {}),
       ...(about ? { about } : {}),
-      ...(idCardUrl ? { idCardUrl } : {}),
     };
     if (areas.length) update.mentorshipAreas = areas;
 

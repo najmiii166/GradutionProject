@@ -8,6 +8,10 @@ import {
   Send, 
   Paperclip, 
   Mic, 
+  Download,
+  Pause,
+  Play,
+  Square,
   MoreVertical, 
   Smile, 
   Reply, 
@@ -24,6 +28,15 @@ import Toast from "../components/Toast";
 import Avatar from "../components/Avatar";
 import MentorProfileModal from "../components/mentor/MentorProfileModal";
 import StudentProfileModal from "../components/mentor/StudentProfileModal";
+
+const CHAT_ATTACHMENT_ACCEPT = "image/*,audio/webm,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z";
+
+const formatDuration = (value) => {
+  const totalSeconds = Math.max(0, Number(value || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
 
 export default function ChatScreen() {
   const navigate = useNavigate();
@@ -111,14 +124,20 @@ export default function ChatScreen() {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState(null);
 
-  const [isRecording, setIsRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState("idle");
   const [recordTime, setRecordTime] = useState(0);
   const [attachment, setAttachment] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState("");
 
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
+  const recordStartedAtRef = useRef(0);
+  const recordedMsRef = useRef(0);
+  const cancelRecordingRef = useRef(false);
+  const attachmentPreviewUrlRef = useRef("");
+  const recordingPreviewUrlRef = useRef("");
   const lastTypingRef = useRef(0);
   const highlightTimerRef = useRef(null);
 
@@ -174,10 +193,133 @@ export default function ChatScreen() {
     return `${serverOrigin}${msg.fileUrl}${sep}token=${attachmentToken}`;
   };
 
+  const downloadAttachment = async (msg) => {
+    try {
+      const url = getAttachmentUrl(msg);
+      if (!url) return;
+
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = msg?.fileName || `attachment-${msg?._id || Date.now()}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      setToast("Download failed");
+    }
+  };
+
   const attachmentMime = attachment?.file?.type || attachment?.type || "";
   const isAudioAttachment = attachmentMime.startsWith("audio/");
   const isImageAttachment = attachmentMime.startsWith("image/");
   const attachmentName = attachment?.file?.name || attachment?.name || "Attachment";
+  const hasActiveRecording = recordingState === "recording" || recordingState === "paused";
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const stopStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const updateAttachmentPreview = (url) => {
+    if (attachmentPreviewUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+    }
+    attachmentPreviewUrlRef.current = url || "";
+    setAttachmentPreview(url || null);
+  };
+
+  const updateRecordingPreview = (url) => {
+    if (recordingPreviewUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(recordingPreviewUrlRef.current);
+    }
+    recordingPreviewUrlRef.current = url || "";
+    setRecordingPreviewUrl(url || "");
+  };
+
+  const clearAttachmentStage = () => {
+    setAttachment(null);
+    updateAttachmentPreview("");
+  };
+
+  const chooseAudioMimeType = () => {
+    if (typeof MediaRecorder === "undefined") return "";
+    const candidates = ["audio/webm;codecs=opus", "audio/webm"];
+    return candidates.find((mime) => MediaRecorder.isTypeSupported?.(mime)) || "";
+  };
+
+  const syncRecordTimer = () => {
+    const elapsedMs = recordedMsRef.current + (recordStartedAtRef.current ? Date.now() - recordStartedAtRef.current : 0);
+    setRecordTime(Math.max(0, Math.round(elapsedMs / 1000)));
+  };
+
+  const startRecordTimer = () => {
+    clearTimer();
+    syncRecordTimer();
+    timerRef.current = setInterval(syncRecordTimer, 250);
+  };
+
+  const buildAudioDraftPreview = () => {
+    if (!chunksRef.current.length) return;
+    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    if (!blob.size) return;
+    updateRecordingPreview(URL.createObjectURL(blob));
+  };
+
+  const cleanupRecorder = () => {
+    clearTimer();
+    stopStream();
+    recorderRef.current = null;
+    recordStartedAtRef.current = 0;
+    recordedMsRef.current = 0;
+    chunksRef.current = [];
+    setRecordingState("idle");
+    setRecordTime(0);
+  };
+
+  const cancelRecording = () => {
+    cancelRecordingRef.current = true;
+    updateRecordingPreview("");
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    } else {
+      cleanupRecorder();
+    }
+  };
+
+  const stageSelectedFile = (file) => {
+    if (!file) return;
+    if (hasActiveRecording) {
+      cancelRecording();
+    }
+
+    updateRecordingPreview("");
+    setAttachment({ file, name: file.name, type: file.type });
+    if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
+      updateAttachmentPreview(URL.createObjectURL(file));
+    } else {
+      updateAttachmentPreview("");
+    }
+  };
 
   // -----------------------------------------
   // CORE LOGIC (UNTOUCHED)
@@ -351,6 +493,16 @@ export default function ChatScreen() {
 
     // OPTIMISTIC UPDATE
     const tempId = "temp-" + Date.now();
+    const stagedFile = attachment?.file || attachment || null;
+    const stagedMime = stagedFile?.type || "";
+    const stagedType = attachment
+      ? stagedMime.startsWith("image/")
+        ? "image"
+        : stagedMime.startsWith("audio/")
+          ? "audio"
+          : "file"
+      : "text";
+
     const tempMsg = {
       _id: tempId,
       sender: user._id,
@@ -358,8 +510,11 @@ export default function ChatScreen() {
       createdAt: new Date().toISOString(),
       status: "pending",
       conversationId: activeConversationId,
-      fileUrl: attachmentPreview && !attachment.file ? attachmentPreview : null, 
-      type: attachment ? (attachment.file?.type.startsWith('image') ? 'image' : 'file') : 'text',
+      fileUrl: null,
+      fileName: stagedFile?.name || null,
+      mimeType: stagedMime || null,
+      duration: attachment?.duration,
+      type: stagedType,
       replyTo: replyTarget
         ? {
             _id: replyTarget._id,
@@ -374,8 +529,8 @@ export default function ChatScreen() {
 
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
-    setAttachment(null);
-    setAttachmentPreview(null);
+  clearAttachmentStage();
+  updateRecordingPreview("");
 
     try {
       let form = new FormData();
@@ -464,37 +619,75 @@ export default function ChatScreen() {
   };
 
   async function startRecording() {
+    if (recordingState === "paused" && recorderRef.current?.state === "paused") {
+      recorderRef.current.resume();
+      recordStartedAtRef.current = Date.now();
+      startRecordTimer();
+      setRecordingState("recording");
+      return;
+    }
+
     try {
-      // Starting a new recording replaces any staged attachment preview.
-      setAttachment(null);
-      setAttachmentPreview(null);
+      clearAttachmentStage();
+      updateRecordingPreview("");
+      cancelRecordingRef.current = false;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const mimeType = chooseAudioMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       recorderRef.current = recorder;
       chunksRef.current = [];
+      recordedMsRef.current = 0;
+      recordStartedAtRef.current = Date.now();
       setRecordTime(0);
-      setIsRecording(true);
-      const start = Date.now();
-      timerRef.current = setInterval(() => setRecordTime(Math.floor((Date.now() - start) / 1000)), 250);
+      setRecordingState("recording");
+      startRecordTimer();
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        clearInterval(timerRef.current);
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const file = new File([blob], `voice-${Date.now()}.webm`, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
-        setAttachment({ file, duration: recordTime });
-        setAttachmentPreview(url);
-        streamRef.current?.getTracks().forEach((t) => t.stop());
+        clearTimer();
+        const finalDurationSeconds = Math.max(1, Math.round(recordedMsRef.current / 1000));
+
+        if (!cancelRecordingRef.current) {
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          if (blob.size > 0) {
+            const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || "audio/webm" });
+            setAttachment({ file, duration: finalDurationSeconds, name: file.name, type: file.type });
+            updateAttachmentPreview(URL.createObjectURL(blob));
+          }
+        }
+
+        updateRecordingPreview("");
+        cleanupRecorder();
+        cancelRecordingRef.current = false;
       };
-      recorder.start();
+      recorder.start(250);
     } catch { setToast("Microphone access denied"); }
   }
 
-  function stopRecording() {
-    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
-    setIsRecording(false);
+  function pauseRecording() {
+    if (!recorderRef.current || recorderRef.current.state !== "recording") return;
+    recordedMsRef.current += Date.now() - recordStartedAtRef.current;
+    recordStartedAtRef.current = 0;
+    clearTimer();
+    syncRecordTimer();
+    recorderRef.current.pause();
+    recorderRef.current.requestData?.();
+    setRecordingState("paused");
+    setTimeout(buildAudioDraftPreview, 80);
+  }
+
+  function finishRecording() {
+    if (!recorderRef.current || recorderRef.current.state === "inactive") return;
+    if (recorderRef.current.state === "recording") {
+      recordedMsRef.current += Date.now() - recordStartedAtRef.current;
+      recordStartedAtRef.current = 0;
+    }
+    clearTimer();
+    syncRecordTimer();
+    recorderRef.current.stop();
   }
 
   const handleEdit = (m) => {
@@ -597,6 +790,10 @@ export default function ChatScreen() {
   useEffect(() => {
     return () => {
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      clearTimer();
+      stopStream();
+      updateAttachmentPreview("");
+      updateRecordingPreview("");
     };
   }, []);
 
@@ -796,15 +993,51 @@ export default function ChatScreen() {
                         {m.fileUrl && (
                           <div className="mb-2 overflow-hidden rounded-lg">
                             {m.type === "image" && (
-                              <img src={getAttachmentUrl(m)} className="max-w-full h-auto hover:scale-105 transition-transform" alt="Packet" />
+                              <div className="space-y-2">
+                                <img src={getAttachmentUrl(m)} className="max-w-full h-auto hover:scale-105 transition-transform" alt="Packet" />
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadAttachment(m);
+                                    }}
+                                    aria-label="Download attachment"
+                                    title="Download"
+                                    className="inline-flex items-center justify-center rounded-xl bg-black/20 p-2 transition-all hover:bg-black/35"
+                                  >
+                                    <Download size={15} />
+                                  </button>
+                                </div>
+                              </div>
                             )}
                             {m.type === "audio" && (
                               <audio controls src={getAttachmentUrl(m)} className="w-48 h-8 opacity-80 filter invert" />
                             )}
                             {m.type === "file" && (
-                              <a href={getAttachmentUrl(m)} download className="flex items-center gap-2 p-3 bg-black/20 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-black/40 transition-all">
-                                <Paperclip size={14} /> {m.fileName || "Download"}
-                              </a>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-black/20 p-3 text-[11px] font-bold uppercase tracking-widest">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <Paperclip size={14} className="shrink-0" />
+                                    <span className="truncate">{m.fileName || "Attachment"}</span>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onClickCapture={(e) => {
+                                      e.stopPropagation();
+                                      downloadAttachment(m);
+                                    }}
+                                    aria-label="Download attachment"
+                                    title="Download"
+                                    className="inline-flex items-center justify-center rounded-xl border border-white/15 p-2 transition-all hover:bg-black/30"
+                                  >
+                                    <Download size={15} />
+                                  </button>
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
@@ -890,31 +1123,90 @@ export default function ChatScreen() {
               <div className="flex items-center gap-1.5 mb-1">
                 <label className="cursor-pointer p-2.5 rounded-xl bg-foreground/[0.03] border border-border/20 hover:border-cyan-500/40 hover:text-cyan-500 transition-all text-foreground/40">
                   <Paperclip size={18} />
-                  <input type="file" className="hidden" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setAttachment(file);
-                    if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
-                      setAttachmentPreview(URL.createObjectURL(file));
-                    } else {
-                      setAttachmentPreview(null);
-                    }
-                  }} />
+                  <input
+                    type="file"
+                    accept={CHAT_ATTACHMENT_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      stageSelectedFile(file);
+                      e.target.value = "";
+                    }}
+                  />
                 </label>
                 
                 <button
-                  onMouseDown={startRecording} onMouseUp={stopRecording}
-                  onTouchStart={startRecording} onTouchEnd={stopRecording}
-                  className={`p-2.5 rounded-xl transition-all border ${isRecording ? "bg-rose-500 text-white animate-pulse border-rose-400" : "bg-foreground/[0.03] border-border/20 text-foreground/40 hover:text-cyan-500"}`}
+                  type="button"
+                  onClick={startRecording}
+                  disabled={recordingState === "recording"}
+                  className={`p-2.5 rounded-xl transition-all border ${hasActiveRecording ? "bg-rose-500 text-white border-rose-400" : "bg-foreground/[0.03] border-border/20 text-foreground/40 hover:text-cyan-500"} ${recordingState === "recording" ? "cursor-not-allowed opacity-80" : ""}`}
                 >
-                  {isRecording ? <span className="text-[10px] font-black">{recordTime}s</span> : <Mic size={18} />}
+                  {hasActiveRecording ? <span className="text-[10px] font-black">{formatDuration(recordTime)}</span> : <Mic size={18} />}
                 </button>
               </div>
 
               <div className="flex-1 relative">
+                {hasActiveRecording && (
+                  <div className="absolute bottom-full left-0 right-0 mb-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 backdrop-blur-md">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-500">Voice Recorder</p>
+                        <p className="mt-1 text-sm font-semibold text-foreground/85">
+                          {recordingState === "recording" ? "Recording in progress" : "Recording paused"}
+                        </p>
+                        <p className="mt-1 text-xs text-foreground/45">Duration {formatDuration(recordTime)}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                        {recordingState === "recording" ? (
+                          <button
+                            type="button"
+                            onClick={pauseRecording}
+                            className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-xs font-semibold text-foreground/70 transition-all hover:text-foreground"
+                          >
+                            <Pause size={14} /> Pause
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-3 py-2 text-xs font-semibold text-foreground/70 transition-all hover:text-foreground"
+                          >
+                            <Play size={14} /> Continue
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={finishRecording}
+                          className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-white transition-all hover:bg-cyan-500"
+                        >
+                          <Square size={13} /> Finish
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={cancelRecording}
+                          className="inline-flex items-center gap-2 rounded-xl border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-500 transition-all hover:bg-rose-500/10"
+                        >
+                          <X size={13} /> Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    {recordingPreviewUrl && recordingState === "paused" && (
+                      <div className="mt-3 rounded-xl border border-border/50 bg-background/70 p-3">
+                        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Preview</p>
+                        <audio controls src={recordingPreviewUrl} className="h-10 w-full" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {(attachmentPreview || attachment) && (
                   <div className="absolute bottom-full left-0 mb-3 p-2 bg-foreground/10 backdrop-blur-md rounded-xl border border-border/40">
-                    <button onClick={() => {setAttachment(null); setAttachmentPreview(null)}} className="absolute -top-2 -right-2 p-1 bg-rose-500 text-white rounded-full shadow-lg"><X size={10}/></button>
+                    <button onClick={clearAttachmentStage} className="absolute -top-2 -right-2 p-1 bg-rose-500 text-white rounded-full shadow-lg"><X size={10}/></button>
                     {isAudioAttachment && attachmentPreview ? (
                       <audio src={attachmentPreview} controls className="h-8 w-40" />
                     ) : isImageAttachment && attachmentPreview ? (
@@ -940,7 +1232,8 @@ export default function ChatScreen() {
 
               <button 
                 onClick={sendMessage}
-                className="mb-1 p-3.5 rounded-2xl bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+                disabled={hasActiveRecording}
+                className="mb-1 p-3.5 rounded-2xl bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 title={editingMessageId ? "Save edit" : "Send message"}
               >
                 <Send size={20} />

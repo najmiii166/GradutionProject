@@ -1,7 +1,6 @@
 // src/pages/StudentRegister.jsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, setAuthToken } from "../api/axios";
-import { useNavigate } from "react-router-dom";
 import { universities, faculties } from "../constants/systemData";
 import Brand from "../components/Brand";
 import Button from "../components/Button";
@@ -26,8 +25,8 @@ import {
 } from "lucide-react";
 
 export default function StudentRegister() {
-  const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -40,52 +39,69 @@ export default function StudentRegister() {
   const [toast, setToast] = useState(null);
   const [successModal, setSuccessModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isTypingPassword, setIsTypingPassword] = useState(false);
   const [selectedUniKey, setSelectedUniKey] = useState(null);
   const [selectedFacultyKey, setSelectedFacultyKey] = useState(null);
-  const [selectedLearningGoals, setSelectedLearningGoals] = useState([]);
+  const [selectedLearningGoal, setSelectedLearningGoal] = useState("");
 
   const strongRe = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}/;
+  const isStep1Valid = useMemo(
+    () =>
+      form.fullName.trim().length > 2 &&
+      /^\S+@\S+\.\S+$/.test(form.email) &&
+      strongRe.test(form.password),
+    [form.fullName, form.email, form.password]
+  );
 
-  const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const update = (e) => {
+    const { name, value } = e.target;
+    if (name === "semester") {
+      // convert to number and clamp between 1 and 10
+      let num = parseInt(value, 10);
+      if (isNaN(num)) {
+        num = "";
+      } else {
+        if (num < 1) num = 1;
+        if (num > 10) num = 10;
+      }
+      setForm({ ...form, [name]: num });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
+  };
 
   const onFacultySelect = (e) => {
     const key = e.target.value || null;
     setSelectedFacultyKey(key);
-    setSelectedLearningGoals([]); 
+    setSelectedLearningGoal("");
   };
 
-  const computePasswordStrength = (pw) => {
-    if (!pw) return { score: 0, label: "", colorText: "text-foreground/40", colorBg: "bg-foreground/[0.12]" };
-    const scoreChecks = [/.{8,}/, /[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z\d]/];
-    let score = 0;
-    if (scoreChecks[0].test(pw)) score++;
-    if (scoreChecks[1].test(pw) && scoreChecks[2].test(pw)) score++;
-    if (scoreChecks[3].test(pw)) score++;
-    if (scoreChecks[4].test(pw)) score++;
-
-    if (score === 0) return { score: 0, label: "Too short", colorText: "text-red-400", colorBg: "bg-red-400" };
-    if (score === 1) return { score, label: "Weak", colorText: "text-red-400", colorBg: "bg-red-400" };
-    if (score === 2) return { score, label: "Medium", colorText: "text-amber-400", colorBg: "bg-amber-400" };
-    if (score === 3) return { score, label: "Strong", colorText: "text-cyan-400", colorBg: "bg-cyan-400" };
-    return { score: 4, label: "Very strong", colorText: "text-violet-400", colorBg: "bg-violet-400" };
-  };
-
-  const nextStep = (e) => {
+  const nextStep = async (e) => {
     e.preventDefault();
     if (!form.fullName || !form.email || !form.password) {
       setToast("Please fill in all fields to continue");
       return;
     }
     if (!strongRe.test(form.password)) return; // Logic handled by inline feedback
-    setStep(2);
+    setCheckingEmail(true);
+    try {
+      await api.post("/auth/check-email", { email: form.email, role: "student" });
+      setStep(2);
+    } catch (err) {
+      setToast(err.response?.data?.message || "Email is already in use");
+    } finally {
+      setCheckingEmail(false);
+    }
   };
 
   const completeAcademicsStep = (e) => {
     e.preventDefault();
     if (!selectedUniKey) return setToast('Please select a university');
     if (!selectedFacultyKey) return setToast('Please select a faculty');
-    if (!selectedLearningGoals.length) return setToast('Please select one learning goal');
+    if (!selectedLearningGoal) return setToast('Please select one learning goal');
+    const semesterNumber = Number(form.semester);
+    if (!Number.isInteger(semesterNumber) || semesterNumber < 1 || semesterNumber > 10) {
+      return setToast('Semester must be a number between 1 and 10');
+    }
     if (!idFile) return setToast('Please upload your Student ID');
     setStep(3);
   };
@@ -120,7 +136,7 @@ export default function StudentRegister() {
     data.append('university', String(selectedUniKey));
     data.append('faculty', selectedFacultyKey);
     data.append('semester', form.semester);
-    data.append('mentorshipAreas', JSON.stringify(selectedLearningGoals));
+    data.append('mentorshipAreas', JSON.stringify(selectedLearningGoal ? [selectedLearningGoal] : []));
     data.append("idCard", idFile);
     if (profileImageFile) {
       data.append("profileImage", profileImageFile);
@@ -139,8 +155,6 @@ export default function StudentRegister() {
       setLoading(false);
     }
   };
-
-  const isPasswordValid = strongRe.test(form.password);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground flex items-center justify-center p-6 selection:bg-cyan-500/30">
@@ -195,8 +209,6 @@ export default function StudentRegister() {
                           name="password"
                           placeholder="Password"
                           value={form.password}
-                          onFocus={() => setIsTypingPassword(true)}
-                          onBlur={() => !form.password && setIsTypingPassword(false)}
                           onChange={update}
                           required
                           className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all"
@@ -206,37 +218,14 @@ export default function StudentRegister() {
                         </button>
                       </div>
 
-                      <AnimatePresence>
-                        {isTypingPassword && form.password.length > 0 && (
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2 overflow-hidden px-1">
-                            {(() => {
-                              const s = computePasswordStrength(form.password);
-                              const pct = Math.min(100, Math.round((s.score / 4) * 100));
-                              return (
-                                <>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-foreground/30 font-bold uppercase tracking-widest">Strength</span>
-                                    <span className={`text-[11px] font-bold ${s.colorText}`}>{s.label}</span>
-                                  </div>
-                                  <div className="h-1.5 w-full bg-foreground/[0.06] rounded-full overflow-hidden">
-                                    <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} className={`h-full ${s.colorBg} transition-all`} />
-                                  </div>
-                                </>
-                              );
-                            })()}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <div className="flex items-start gap-2 px-1">
-                        <Info className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${form.password && !isPasswordValid ? "text-amber-500" : "text-foreground/30"}`} />
-                        <p className={`text-[11px] leading-tight ${form.password && !isPasswordValid ? "text-amber-500/80 font-medium" : "text-foreground/40"}`}>
-                          8+ characters, uppercase, lowercase, number & symbol.
-                        </p>
-                      </div>
+                      {!strongRe.test(form.password) && form.password.length > 0 && (
+                        <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/10 text-[11px] text-primary/80">
+                          <Info className="w-3.5 h-3.5" /> Password must be 8+ chars with mix of cases, numbers & symbols.
+                        </div>
+                      )}
                     </div>
 
-                    <Button type="submit" variant="primary" className="w-full group shadow-lg" disabled={form.password.length > 0 && !isPasswordValid}>
+                    <Button type="submit" variant="primary" className="w-full group shadow-lg" disabled={!isStep1Valid} loading={checkingEmail}>
                       Continue to Academics
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </Button>
@@ -264,16 +253,16 @@ export default function StudentRegister() {
                         <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-1">Learning Goal</p>
                         <div className="grid grid-cols-2 gap-2">
                           {(faculties.find(f => f.key === selectedFacultyKey)?.subs || []).map((sub) => (
-                            <label key={sub.key} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedLearningGoals.includes(sub.key) ? 'border-cyan-500/50 bg-cyan-500/[0.03]' : 'border-border bg-background hover:border-cyan-500/30'}`}>
+                            <label key={sub.key} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${selectedLearningGoal === sub.key ? 'border-cyan-500/50 bg-cyan-500/[0.03]' : 'border-border bg-background hover:border-cyan-500/30'}`}>
                               <input
                                 type="radio"
                                 name="learningGoal"
                                 className="hidden"
-                                checked={selectedLearningGoals[0] === sub.key}
-                                onChange={() => setSelectedLearningGoals([sub.key])}
+                                checked={selectedLearningGoal === sub.key}
+                                onChange={() => setSelectedLearningGoal(sub.key)}
                               />
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedLearningGoals.includes(sub.key) ? 'bg-cyan-500 border-cyan-500' : 'border-border'}`}>
-                                {selectedLearningGoals.includes(sub.key) && <CheckCircle2 className="w-3 h-3 text-white" />}
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedLearningGoal === sub.key ? 'bg-cyan-500 border-cyan-500' : 'border-border'}`}>
+                                {selectedLearningGoal === sub.key && <CheckCircle2 className="w-3 h-3 text-white" />}
                               </div>
                               <span className="text-xs text-foreground/70">{sub.name}</span>
                             </label>
@@ -284,10 +273,21 @@ export default function StudentRegister() {
 
                     <div className="relative group">
                       <Layers className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
-                      <input type="text" name="semester" placeholder="Current Semester (e.g. 5)" value={form.semester} onChange={update} required className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all" />
+                      <input type="number" min="1" max="10" step="1" name="semester" placeholder="Current Semester (1-10)" value={form.semester} onChange={update} required className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all" />
                     </div>
 
-                    <FileDrop label="Student ID Verification" onFile={setIdFile} />
+                    <FileDrop
+                      label="Student ID Verification"
+                      onFile={(file) => {
+                        const MAX = 10 * 1024 * 1024;
+                        if (file && file.size > MAX) {
+                          setToast("Image must be 10MB or smaller");
+                          setIdFile(null);
+                        } else {
+                          setIdFile(file || null);
+                        }
+                      }}
+                    />
 
                     <Button type="submit" variant="primary" className="w-full shadow-lg">
                       Continue to Profile Identity

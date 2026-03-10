@@ -9,6 +9,7 @@ import { auth } from "../middleware/auth.js";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { uploadChatAttachment } from "../middleware/upload.js";
+import { resolveUploadAbsolutePath } from "../utils/uploadStorage.js";
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +20,19 @@ const attachmentSecret =
 const attachmentKey = crypto.createHash("sha256").update(String(attachmentSecret || "mentorlink-chat")).digest();
 
 let legacyEncryptionPromise = null;
+
+function resolveChatAttachmentPath(fileDiskName) {
+  const normalized = String(fileDiskName || "").replace(/\\+/g, "/").trim();
+  if (!normalized) {
+    throw new Error("Missing attachment path");
+  }
+
+  if (normalized.startsWith("chat/")) {
+    return resolveUploadAbsolutePath(`/uploads/${normalized}`).absolutePath;
+  }
+
+  return path.join(chatUploadsDir, normalized);
+}
 
 function encryptBuffer(plainBuffer) {
   const iv = crypto.randomBytes(12);
@@ -65,7 +79,7 @@ async function ensureLegacyChatFilesEncrypted() {
 
     for (const item of legacyMessages) {
       try {
-        const filePath = path.join(chatUploadsDir, item.fileDiskName);
+        const filePath = resolveChatAttachmentPath(item.fileDiskName);
         const { iv, authTag } = await encryptFileOnDisk(filePath);
         await Message.updateOne(
           { _id: item._id },
@@ -240,7 +254,7 @@ router.get("/:convoId/messages/:msgId/attachment", async (req, res) => {
       return res.status(404).json({ message: "Attachment not found" });
     }
 
-    const filePath = path.join(chatUploadsDir, msg.fileDiskName);
+    const filePath = resolveChatAttachmentPath(msg.fileDiskName);
 
     if (msg.fileIv && msg.fileAuthTag) {
       let encryptedBuffer;
@@ -310,10 +324,10 @@ router.post(
     if (req.file) {
       const mime = req.file.mimetype;
 
-      const filePath = path.join(chatUploadsDir, req.file.filename);
+      const filePath = req.file.storedAbsolutePath;
       const { iv, authTag } = await encryptFileOnDisk(filePath);
 
-      const fileUrl = `/uploads/chat/${req.file.filename}`;
+      const fileUrl = req.file.storedPublicUrl;
 
       let type = "file";
       if (mime.startsWith("image/")) type = "image";
@@ -323,7 +337,7 @@ router.post(
         ...payload,
         type,
         fileUrl,
-        fileDiskName: req.file.filename,
+        fileDiskName: req.file.storedRelativePath,
         fileIv: iv,
         fileAuthTag: authTag,
         fileName: req.file.originalname,

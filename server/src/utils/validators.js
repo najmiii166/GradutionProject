@@ -33,9 +33,24 @@ export const studentRegisterRules = [
   body("university").notEmpty(),
   // Frontend now sends `faculty` (key) instead of free-text `major`
   body("faculty").notEmpty(),
-  body("semester").notEmpty(),
-  // NEW: mentorship areas (comma separated string from frontend)
-  body("mentorshipAreas").optional().isString(),
+  body("semester").isInt({ min: 1, max: 10 }),
+  body("mentorshipAreas").optional().custom((value) => {
+    if (Array.isArray(value)) {
+      return value.length <= 1;
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.length <= 1 : typeof value === "string";
+      } catch {
+        return String(value)
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean).length <= 1;
+      }
+    }
+    return false;
+  }),
 ];
 
 export const loginRules = [

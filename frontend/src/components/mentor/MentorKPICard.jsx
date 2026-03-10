@@ -5,6 +5,7 @@ export default function MentorKPICard({
   label, 
   value, 
   icon: Icon,
+  hint,
   // New props for theme support
   bg = "bg-card/40", 
   textColor = "text-cyan-800 dark:text-cyan-400", 
@@ -34,6 +35,11 @@ export default function MentorKPICard({
         <h3 className="text-3xl font-bold tracking-tight tabular-nums">
           {value}
         </h3>
+        {hint ? (
+          <p className="text-[11px] text-foreground/55 dark:text-foreground/50 font-medium">
+            {hint}
+          </p>
+        ) : null}
       </div>
 
       {/* ICON - Enhanced Visibility */}

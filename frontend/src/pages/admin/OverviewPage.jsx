@@ -5,7 +5,7 @@ import { api } from "../../api/axios";
 import DetailsModal from "../../components/admin/DetailsModal";
 import StatCard from "../../components/admin/StatCard";
 import ChartBox from "../../components/admin/ChartBox";
-import { Users, GraduationCap, Clock, TrendingUp, BarChart3 } from "lucide-react";
+import { Users, GraduationCap, Clock, TrendingUp, BarChart3, Star } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -18,8 +18,15 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { faculties } from "../../constants/systemData";
+import { faculties, universities } from "../../constants/systemData";
 import SocketContext from "../../Contexts/SocketContext";
+
+const getUniversityName = (value) => {
+  if (!value) return "—";
+  const normalized = String(value).trim().toLowerCase();
+  const match = universities.find((item) => String(item.key).toLowerCase() === normalized);
+  return match?.name || value;
+};
 
 export default function OverviewPage({ stats, analytics }) {
   const { socket } = useContext(SocketContext) || {};
@@ -63,16 +70,30 @@ export default function OverviewPage({ stats, analytics }) {
   const [studentAreas, setStudentAreas] = useState([]);
   const [topCompleted, setTopCompleted] = useState([]);
   const [topExpired, setTopExpired] = useState([]);
+  const [topRatedMentor, setTopRatedMentor] = useState(null);
+  const [sessionSummary, setSessionSummary] = useState({
+    total: 0,
+    upcoming: 0,
+    ongoing: 0,
+    completed: 0,
+    expired: 0,
+  });
   // re-fetch helpers
   const fetchOverview = async () => {
     try {
-      const a = await api.get('/admin/reports/drilldown/students', { params: { type: 'topStudentAreas', top: 8 } });
+      const [a, t, m, s] = await Promise.all([
+        api.get('/admin/reports/drilldown/students', { params: { type: 'topStudentAreas', top: 8 } }),
+        api.get('/admin/reports/top-mentor-sessions', { params: { top: 8 } }),
+        api.get('/admin/reports/mentors', { params: { top: 1 } }),
+        api.get('/admin/reports/sessions', { params: { top: 1 } }),
+      ]);
       const rows = a.data?.rows || [];
       setStudentAreas(rows.map(r => ({ name: areaNameMap[r._id] || (r._id || '').replace(/_/g, ' '), count: r.count })));
 
-      const t = await api.get('/admin/reports/top-mentor-sessions', { params: { top: 8 } });
       setTopCompleted(t.data?.topCompleted || []);
       setTopExpired(t.data?.topExpired || []);
+      setTopRatedMentor(m.data?.bestRatedMentor || null);
+      setSessionSummary(s.data?.summary || { total: 0, upcoming: 0, ongoing: 0, completed: 0, expired: 0 });
     } catch (err) {
       console.error('Overview data load error:', err);
     }
@@ -203,6 +224,64 @@ export default function OverviewPage({ stats, analytics }) {
           textColor="text-amber-800 dark:text-amber-400"
           glow="bg-amber-500/20"
         />
+      </div>
+
+      <div className="rounded-[2rem] border border-cyan-500/15 bg-gradient-to-br from-cyan-500/10 via-card to-transparent p-5 shadow-lg">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
+              <Star size={15} />
+              <span className="text-[10px] font-black uppercase tracking-[0.22em]">Top Rated Verified Mentor</span>
+            </div>
+            <h3 className="mt-3 text-2xl font-semibold text-foreground/90">
+              {topRatedMentor?.name || "No rated mentor available yet"}
+            </h3>
+            <p className="mt-2 text-sm text-foreground/55">
+              {getUniversityName(topRatedMentor?.institution)}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:min-w-[280px]">
+            <div className="rounded-2xl border border-cyan-500/20 bg-background/80 px-4 py-3 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Average Rating</p>
+              <p className="mt-2 text-2xl font-semibold text-cyan-600">
+                {topRatedMentor?.averageRating?.toFixed?.(1) || topRatedMentor?.averageRating || "0.0"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-cyan-500/20 bg-background/80 px-4 py-3 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Total Ratings</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground/85">{topRatedMentor?.totalRatings || 0}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="rounded-[1.6rem] border border-border/50 bg-card/70 p-4 shadow-sm backdrop-blur-md">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Total Sessions</p>
+          <p className="mt-3 text-3xl font-semibold text-foreground/90">{sessionSummary.total || 0}</p>
+          <p className="mt-2 text-xs text-foreground/45">All tracked verified sessions</p>
+        </div>
+        <div className="rounded-[1.6rem] border border-violet-500/15 bg-violet-500/5 p-4 shadow-sm backdrop-blur-md">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Upcoming</p>
+          <p className="mt-3 text-3xl font-semibold text-violet-600">{sessionSummary.upcoming || 0}</p>
+          <p className="mt-2 text-xs text-foreground/45">Accepted sessions not started yet</p>
+        </div>
+        <div className="rounded-[1.6rem] border border-cyan-500/15 bg-cyan-500/5 p-4 shadow-sm backdrop-blur-md">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Ongoing</p>
+          <p className="mt-3 text-3xl font-semibold text-cyan-600">{sessionSummary.ongoing || 0}</p>
+          <p className="mt-2 text-xs text-foreground/45">Sessions currently live</p>
+        </div>
+        <div className="rounded-[1.6rem] border border-emerald-500/15 bg-emerald-500/5 p-4 shadow-sm backdrop-blur-md">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Completed</p>
+          <p className="mt-3 text-3xl font-semibold text-emerald-600">{sessionSummary.completed || 0}</p>
+          <p className="mt-2 text-xs text-foreground/45">Successfully finished sessions</p>
+        </div>
+        <div className="rounded-[1.6rem] border border-rose-500/15 bg-rose-500/5 p-4 shadow-sm backdrop-blur-md">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Expired</p>
+          <p className="mt-3 text-3xl font-semibold text-rose-600">{sessionSummary.expired || 0}</p>
+          <p className="mt-2 text-xs text-foreground/45">Sessions ended without completion</p>
+        </div>
       </div>
 
       {/* 2. Refined Charts Area */}

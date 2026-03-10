@@ -10,7 +10,8 @@ import User from "../models/User.js";
 import MentorProfile from "../models/MentorProfile.js";
 import StudentProfile from "../models/StudentProfile.js";
 import Request from "../models/Request.js";
-// Use Node's built-in fetch (Node 18+)
+import { generateMentorSummary } from "../services/mentorSummary.service.js";
+import { getMentorBadge, getMentorRatingSummary } from "../utils/mentorRatings.js";
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ const signToken = (user) =>
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
+
 
 /* =======================================================
    MENTOR REGISTRATION
@@ -245,9 +247,10 @@ router.get("/students/:id", auth, requireRole("mentor"), async (req, res) => {
       profileImageUrl: studentProfile.user?.profileImageUrl || "",
       university: studentProfile.user?.university || "",
       major: studentProfile.major || "",
+      faculty: studentProfile.faculty || "",
       semester: studentProfile.semester || "",
       about: studentProfile.about || "",
-      idCardUrl: studentProfile.idCardUrl || "",
+      mentorshipAreas: studentProfile.mentorshipAreas || [],
     });
   } catch (err) {
     console.error("GET student profile error:", err);
@@ -265,11 +268,21 @@ router.get("/mentors/:id", auth, requireRole("student"), async (req, res) => {
 
     const mentorProfile = await MentorProfile.findOne({ user: mentorId })
       .populate("user", "fullName email university profileImageUrl")
+      .populate({
+        path: "ratings.user",
+        model: "User",
+        select: "fullName role",
+      })
       .lean();
 
     if (!mentorProfile) {
       return res.status(404).json({ message: "Mentor profile not found." });
     }
+
+    const ratingSummary = await getMentorRatingSummary(mentorProfile._id, {
+      includeRecent: true,
+      recentLimit: 5,
+    });
 
     return res.json({
       userId: mentorProfile.user?._id,
@@ -284,32 +297,18 @@ router.get("/mentors/:id", auth, requireRole("student"), async (req, res) => {
       yearsOfExperience: mentorProfile.yearsOfExperience || 0,
       expertiseAreas: mentorProfile.expertiseAreas || [],
       availability: mentorProfile.availability || [],
-      averageRating: mentorProfile.averageRating || 0,
-      totalRatings: mentorProfile.totalRatings || 0,
-      // compute percent of positive ratings (4 or 5)
-      percentPositive: (() => {
-        try {
-          const arr = mentorProfile.ratings || [];
-          if (!arr.length) return 0;
-          const ok = arr.filter((r) => (r.score || 0) >= 4).length;
-          return Math.round((ok / arr.length) * 100);
-        } catch (e) {
-          return 0;
-        }
-      })(),
-      // compute a simple badge
-      badge: (() => {
-        try {
-          const avg = mentorProfile.averageRating || 0;
-          const total = mentorProfile.totalRatings || 0;
-          if (avg >= 4.7 && total >= 10) return "Top Mentor";
-          if (avg >= 4.5 && total >= 5) return "Highly Rated";
-          if (avg >= 4 && total >= 3) return "Recommended";
-          return "—";
-        } catch (e) {
-          return "—";
-        }
-      })(),
+      averageRating: ratingSummary.averageRating,
+      totalRatings: ratingSummary.totalRatings,
+      percentPositive: ratingSummary.percentPositive,
+      badge: ratingSummary.badge,
+      recentRatings: ratingSummary.recentRatings.map((item) => ({
+        userId: item.user,
+        userName: item.userName,
+        userRole: item.userRole,
+        score: item.score,
+        comment: item.comment,
+        createdAt: item.createdAt,
+      })),
     });
   } catch (err) {
     console.error("GET mentor profile error:", err);
@@ -370,23 +369,24 @@ router.get("/mentors/:id/ratings", async (req, res) => {
   try {
     const mentorUserId = req.params.id;
 
-    const profile = await MentorProfile.findOne({ user: mentorUserId }).populate({
-      path: "ratings.user",
-      model: "User",
-      select: "fullName role",
-    }).lean();
+    const profile = await MentorProfile.findOne({ user: mentorUserId }).lean();
 
     if (!profile) return res.status(404).json({ message: "Mentor profile not found" });
 
-    const list = (profile.ratings || []).map((r) => ({
-      userId: r.user?._id || r.user,
-      userName: r.user?.fullName || "Anonymous",
-      userRole: r.user?.role || null,
-      score: r.score || 0,
-      comment: r.comment || "",
-      createdAt: r.createdAt || r._id?.getTimestamp?.() || null,
-      isNowMentor: (r.user && r.user.role === "mentor") || false,
-    })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const ratingSummary = await getMentorRatingSummary(profile._id, {
+      includeRecent: true,
+      recentLimit: 50,
+    });
+
+    const list = (ratingSummary.recentRatings || []).map((item) => ({
+      userId: item.user,
+      userName: item.userName,
+      userRole: item.userRole,
+      score: item.score,
+      comment: item.comment,
+      createdAt: item.createdAt,
+      isNowMentor: item.userRole === "mentor",
+    }));
 
     return res.json(list);
   } catch (err) {
@@ -398,9 +398,34 @@ router.get("/mentors/:id/ratings", async (req, res) => {
 /* =======================================================
    STATS / DUMMY ROUTES (avoid dashboard 404s)
 ======================================================= */
-router.get("/stats", (req, res) =>
-  res.json({ averageRating: 0, totalRatings: 0, credits: 0, badge: "—" })
-);
+router.get("/stats", auth, requireRole("mentor"), async (req, res) => {
+  try {
+    const profile = await MentorProfile.findOne({ user: req.user.id })
+      .select("averageRating totalRatings ratings")
+      .lean();
+
+    if (!profile) {
+      return res.json({ averageRating: 0, totalRatings: 0, credits: 0, badge: "—" });
+    }
+
+    const ratingSummary = await getMentorRatingSummary(profile._id);
+    const credits = await Request.countDocuments({
+      mentorId: profile._id,
+      status: "completed",
+    });
+
+    return res.json({
+      averageRating: ratingSummary.averageRating,
+      totalRatings: ratingSummary.totalRatings,
+      credits,
+      badge: ratingSummary.badge || getMentorBadge(profile.averageRating, profile.totalRatings),
+      percentPositive: ratingSummary.percentPositive,
+    });
+  } catch (err) {
+    console.error("GET mentor stats error:", err);
+    return res.status(500).json({ message: "Failed to load mentor stats" });
+  }
+});
 router.get("/sessions/upcoming", (req, res) => res.json([]));
 
 /* =======================================================
@@ -444,7 +469,7 @@ router.get("/requests/:requestId/ai-summary", auth, requireRole("mentor"), async
 
     const q = request.questionnaire || {};
     const slot = request.slot || {};
-    const prompt = {
+    const result = await generateMentorSummary({
       reason: String(q.reason || "").trim(),
       goals: Array.isArray(q.goals) ? q.goals.slice(0, 8) : [],
       sessionGoal: String(q.sessionGoal || "").trim(),
@@ -454,88 +479,22 @@ router.get("/requests/:requestId/ai-summary", auth, requireRole("mentor"), async
         from: String(slot.from || "").trim(),
         to: String(slot.to || "").trim(),
       },
-    };
+      language: String(req.query?.lang || req.body?.language || "en").trim().toLowerCase() === "so" ? "so" : "en",
+    });
 
-    // Try Gemini; fall back deterministically if unavailable or errors
-    const apiKey = process.env.GEMINI_API_KEY;
-    let result = null;
-    if (apiKey) {
-      try {
-        const system = `Respond with STRICT JSON only. Do NOT invent content. Rules:\n- summary: 1-3 sentences paraphrasing ONLY student's provided text (reason + sessionGoal).\n- keyPoints: derived ONLY from provided goals (and sessionGoal if present).\n- difficulty: MUST mirror experienceLevel exactly (beginner|intermediate|advanced).\n- suggestedAgenda: MUST be an empty array [].`;
-        const userText = `Student request data (use extractive summarization only):\n${JSON.stringify(prompt, null, 2)}\nReturn ONLY JSON with keys {summary, keyPoints, difficulty, suggestedAgenda}.`;
-        const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              { role: "user", parts: [{ text: system + "\n" + userText }] },
-            ],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 512,
-            },
-          }),
-        });
-        const data = await resp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
-        try {
-          const parsed = JSON.parse(text);
-          // Enforce extractive-only output regardless of model response
-          if (parsed && typeof parsed === "object") {
-            result = {
-              summary: buildSummaryStrict(prompt),
-              keyPoints: buildKeyPointsStrict(prompt),
-              difficulty: difficultyStrict(q.experienceLevel),
-              suggestedAgenda: [],
-            };
-          }
-        } catch (e) {
-          // fall through to fallback
-        }
-      } catch (err) {
-        // fall through to fallback
-      }
-    }
-
-    if (!result) {
-      // Deterministic fallback (extractive-only)
-      const level = difficultyStrict(q.experienceLevel);
-      result = {
-        summary: buildSummaryStrict(prompt),
-        keyPoints: buildKeyPointsStrict(prompt),
-        difficulty: level,
+    return res.json({
+      success: true,
+      data: {
+        ...result,
         suggestedAgenda: [],
-      };
-    }
-
-    return res.json({ success: true, data: result });
+      },
+    });
   } catch (err) {
     console.error("AI summary error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
 
-function difficultyStrict(experienceLevel = "") {
-  const v = String(experienceLevel || "").toLowerCase();
-  if (["beginner", "intermediate", "advanced"].includes(v)) return v;
-  return "unknown";
-}
-
-function buildSummaryStrict(p) {
-  const parts = [];
-  if (p.reason) parts.push(p.reason.trim());
-  if (p.sessionGoal) parts.push(`Focus: ${p.sessionGoal.trim()}`);
-  // Keep strictly to student text; avoid adding derived content
-  const s = parts.join(". ");
-  return s.length ? s.slice(0, 500) : "";
-}
-
-function buildKeyPointsStrict(p) {
-  const out = [];
-  if (p.sessionGoal) out.push(p.sessionGoal.trim());
-  if (Array.isArray(p.goals)) out.push(...p.goals.map((g) => String(g).trim()).slice(0, 5));
-  return out.slice(0, 5);
-}
 router.get("/conversations", (req, res) => res.json([]));
 router.get("/conversations/:id/messages", (req, res) => res.json([]));
 

@@ -165,16 +165,18 @@ export default function MentorDashboard() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MentorKPICard
             icon={Users}
-            label="Expertise Areas"
-            value={expertiseCount}
+            label="Pending Requests"
+            value={requests.length}
+            hint="Students currently waiting for a response"
             bg="bg-kpi-1"
             textColor="text-cyan-800 dark:text-cyan-400"
             glow="bg-cyan-500/20"
           />
           <MentorKPICard
             icon={Calendar}
-            label="Available Days"
-            value={availabilityCount}
+            label="Upcoming Sessions"
+            value={upcomingSessions.length}
+            hint="Scheduled sessions on your queue"
             bg="bg-kpi-2"
             textColor="text-violet-800 dark:text-violet-400"
             glow="bg-violet-500/20"
@@ -183,14 +185,16 @@ export default function MentorDashboard() {
             icon={Star}
             label="Avg Rating"
             value={stats?.averageRating ? Number(stats.averageRating).toFixed(1) : "0.0"}
+            hint={`${stats?.totalRatings || 0} student reviews received`}
             bg="bg-kpi-3"
             textColor="text-amber-800 dark:text-amber-400"
             glow="bg-amber-500/20"
           />
           <MentorKPICard
             icon={Clock}
-            label="Total Credits"
+            label="Completed Sessions"
             value={stats?.credits || 0}
+            hint="Mentorship sessions successfully finished"
             bg="bg-kpi-4"
             textColor="text-rose-800 dark:text-rose-400"
             glow="bg-rose-500/20"

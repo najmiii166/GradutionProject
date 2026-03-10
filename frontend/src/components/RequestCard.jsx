@@ -94,7 +94,7 @@ export default function RequestCard({
         )}
 
         {/* ACTIONS */}
-        <div className="flex items-center justify-between pt-4 border-t border-border/30">
+        <div className="flex items-center justify-between pt-4 border-t border-border/30 mt-auto">
           <div className="flex items-center gap-4">
             {(effectiveStatus === "upcoming" || effectiveStatus === "ongoing") && (
               <button
@@ -115,28 +115,25 @@ export default function RequestCard({
                 <MessageCircle size={14} /> Chat
               </button>
             )}
+          </div>
 
-            {canJoin && (
+          <div className="flex items-center gap-3">
+            {canJoin ? (
               <button
                 onClick={async () => {
                   try {
-                    // Fire-and-forget join tracking; do not block opening link
                     await api.post(`/requests/${r._id}/join`);
                   } catch {}
                   try {
                     window.open(r.meetingLink, "_blank", "noopener,noreferrer");
                   } catch {}
                 }}
-                className="flex-1 inline-flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-widest py-2 rounded-xl bg-cyan-500 text-white hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
+                className="group/join flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors duration-300"
               >
-                <ExternalLink size={12} />
-                Join
+                <span className="group-hover/join:underline underline-offset-4">Join Session</span>
+                <ExternalLink className="w-3.5 h-3.5 group-hover/join:-translate-y-0.5 group-hover/join:translate-x-0.5 transition-transform" />
               </button>
-            )}
-          </div>
-
-          <div className="flex items-center">
-            {r.status === "pending" ? (
+            ) : r.status === "pending" ? (
               <button
                 onClick={() => cancelRequest(r._id)}
                 className="text-[9px] font-black uppercase tracking-widest text-rose-500/40 hover:text-rose-500 transition-colors"
@@ -150,8 +147,8 @@ export default function RequestCard({
               >
                 Remove
               </button>
-            ) : !canJoin && r.meetingLink && (
-              <span className="text-[7px] font-bold text-foreground/20 uppercase">
+            ) : r.meetingLink && (
+              <span className="text-[9px] font-bold text-foreground/40 uppercase tracking-wider bg-foreground/5 px-2 py-1 rounded-full border border-border/20">
                 Join link ready soon
               </span>
             )}

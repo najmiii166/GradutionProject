@@ -65,6 +65,39 @@ router.post("/", auth, async (req, res) => {
       throw err;
     }
 
+    if (isStudent) {
+      const ratingItems = await Feedback.find({
+        mentorId: session.mentorId,
+        raterRole: "student",
+        rating: { $exists: true, $gt: 0 },
+      })
+        .select("studentId rating comment createdAt")
+        .lean();
+
+      const totalRatings = ratingItems.length;
+      const averageRating = totalRatings
+        ? Number(
+            (
+              ratingItems.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
+              totalRatings
+            ).toFixed(2)
+          )
+        : 0;
+
+      await MentorProfile.findByIdAndUpdate(session.mentorId, {
+        $set: {
+          ratings: ratingItems.map((item) => ({
+            user: item.studentId,
+            score: Number(item.rating || 0),
+            comment: item.comment || "",
+            createdAt: item.createdAt || new Date(),
+          })),
+          totalRatings,
+          averageRating,
+        },
+      });
+    }
+
     res.json({ success: true, data: { id: doc._id } });
   } catch (err) {
     console.error("Feedback submit error:", err);

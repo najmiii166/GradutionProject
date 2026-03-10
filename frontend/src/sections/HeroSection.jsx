@@ -28,11 +28,27 @@ export default function HeroSection({ onOpenJoin }) {
   };
 
   return (
-    <section id="home" className="relative overflow-hidden bg-transparent text-foreground pt-12">
+    <section id="home" className="relative overflow-hidden bg-transparent text-foreground pt-12 pb-24">
       {/* Dynamic Background Art */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
+        {/* Shiny, node-less grid in the top right corner */}
+        <div 
+          className="absolute top-0 right-0 w-80 h-80 md:w-[30rem] md:h-[30rem] pointer-events-none" 
+          style={{ 
+            backgroundImage: `
+              linear-gradient(to right, rgba(6, 182, 212, 0.4) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(139, 92, 246, 0.4) 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+            maskImage: "radial-gradient(circle at top right, black 15%, transparent 65%)",
+            WebkitMaskImage: "radial-gradient(circle at top right, black 15%, transparent 65%)"
+          }}
+        />
+        {/* Subtle glow specifically behind the grid to make the colors pop more */}
+        <div className="absolute -top-[5%] -right-[5%] h-[300px] w-[300px] rounded-full bg-cyan-400/20 blur-[80px] pointer-events-none" />
+        
         <div className="absolute -top-[10%] -left-[10%] h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[140px] animate-pulse" />
-        <div className="absolute top-[10%] right-[5%] h-[500px] w-[500px] rounded-full bg-violet-500/10 blur-[140px]" />
+        <div className="absolute top-[20%] left-[60%] h-[500px] w-[500px] rounded-full bg-violet-500/10 blur-[140px]" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-8 pt-12 pb-16 md:pt-16 md:pb-20">
@@ -108,46 +124,63 @@ Bridging the gap between ambitious Somali students and experienced mentors.     
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative lg:-mt-6"
           >
-            <div className="relative z-10 rounded-[3rem] border border-border/50 bg-card/30 p-3 backdrop-blur-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
-              <div className="overflow-hidden rounded-[2.5rem] bg-background">
+            <div className="relative z-10 rounded-[3rem] border border-border/50 bg-card/30 p-3 backdrop-blur-2xl shadow-2xl">
+              <div className="overflow-hidden rounded-[2.5rem] bg-background relative group">
                 <img 
                   src={heroImageSrc} 
                   alt="MentorLink Dashboard" 
-                  className="w-full object-cover transition-transform duration-1000 hover:scale-105" 
+                  className="w-full object-cover transition-transform duration-1000 group-hover:scale-105" 
                 />
               </div>
+
+              {/* Floating Stickers Overlapping the Image Edge */}
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.8, type: "spring", stiffness: 300, damping: 20 }}
+                className="absolute top-6 -left-5 md:top-10 md:-left-8 z-20 rounded-2xl border border-border/40 bg-card/95 backdrop-blur-xl px-3 py-2 flex items-center gap-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.2)]"
+              >
+                <div className="flex bg-blue-500/10 text-blue-500 rounded-xl p-1.5">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground leading-tight">Verified</span>
+                  <span className="text-[11px] text-muted-foreground font-medium">Trusted Mentors</span>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, x: -20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                transition={{ delay: 1, type: "spring", stiffness: 300, damping: 20 }}
+                className="absolute -bottom-5 right-6 md:-bottom-6 md:right-12 z-20 rounded-2xl border border-border/40 bg-card/95 backdrop-blur-xl px-3 py-2 flex items-center gap-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.2)]"
+              >
+                <div className="flex bg-cyan-500/10 text-cyan-500 rounded-xl p-1.5">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground leading-tight">Live 1:1</span>
+                  <span className="text-[11px] text-muted-foreground font-medium">Google Meet</span>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 1.2, type: "spring", stiffness: 300, damping: 20 }}
+                className="absolute top-[45%] -right-5 md:-right-10 -translate-y-1/2 z-20 rounded-2xl border border-border/40 bg-card/95 backdrop-blur-xl px-3 py-2 flex items-center gap-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.2)]"
+              >
+                <div className="flex bg-violet-500/10 text-violet-500 rounded-xl p-1.5">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground leading-tight">Matched</span>
+                  <span className="text-[11px] text-muted-foreground font-medium">Precise pairing</span>
+                </div>
+              </motion.div>
             </div>
             {/* Glow Behind Image */}
             <div className="absolute -inset-4 -z-10 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 blur-3xl rounded-[4rem]" />
-
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[{
-                icon: <ShieldCheck className="w-4 h-4" aria-hidden="true" />,
-                title: "Verified",
-                desc: "Only trusted university members",
-              }, {
-                icon: <Video className="w-4 h-4" aria-hidden="true" />,
-                title: "Live 1:1",
-                desc: "Seamless Google Meet sessions",
-              }, {
-                icon: <Sparkles className="w-4 h-4" aria-hidden="true" />,
-                title: "Matched",
-                desc: "Precision area-based pairing",
-              }].map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-border bg-card/80 px-3.5 py-3 flex items-start gap-3 shadow-[0_6px_24px_-12px_rgba(0,0,0,0.15)]"
-                >
-                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-foreground/5 text-foreground">
-                    {item.icon}
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="text-sm font-semibold text-foreground">{item.title}</div>
-                    <p className="text-[12px] text-muted leading-snug">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </div>

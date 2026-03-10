@@ -65,7 +65,7 @@ export default function StudentProfileModal({ open, loading, profile, onClose })
                     <div className="flex items-center gap-3">
                       <University size={14} className="text-cyan-500/50" />
                       <span className="text-xs font-bold uppercase tracking-wider text-foreground/60">
-                        {profile?.university || "No University"}
+                        {profile?.university || profile?.user?.university || "No University"}
                       </span>
                     </div>
                     
@@ -93,6 +93,20 @@ export default function StudentProfileModal({ open, loading, profile, onClose })
                     <p className="text-[13px] leading-relaxed text-foreground/60 italic font-serif text-center">
                         "{profile.about}"
                     </p>
+                  </div>
+                )}
+
+                {/* Mentorship Areas */}
+                {profile?.mentorshipAreas && profile.mentorshipAreas.length > 0 && (
+                  <div className="px-1 mt-4">
+                    <p className="text-[10px] uppercase tracking-widest font-black text-foreground/30 mb-3 text-center">Interests</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {profile.mentorshipAreas.map((area, idx) => (
+                        <span key={idx} className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shadow-sm">
+                          {area}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

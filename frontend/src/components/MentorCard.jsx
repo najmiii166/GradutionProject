@@ -23,8 +23,8 @@ export default function MentorCard({ mentor, onClick, disabled = false }) {
   const expertise = mentor.expertiseAreas || [];
   const availability = mentor.availability || [];
   const experience = mentor.yearsOfExperience ?? 0;
-  const averageRating = mentor.averageRating ?? mentor.user?.averageRating ?? 0;
-  const totalRatings = mentor.totalRatings ?? 0;
+  const averageRating = Number(mentor.averageRating ?? mentor.user?.averageRating ?? 0);
+  const totalRatings = Number(mentor.totalRatings ?? mentor.user?.totalRatings ?? 0);
 
   return (
     <motion.div
@@ -53,7 +53,7 @@ export default function MentorCard({ mentor, onClick, disabled = false }) {
             <div className="flex items-center gap-2 mt-1.5">
               <div className="flex items-center gap-1 text-[10px] font-bold text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded-md border border-cyan-500/20">
                 <Star size={10} fill="currentColor" />
-                {(averageRating || 0).toFixed(1)}
+                {averageRating.toFixed(1)}
               </div>
               <span className="text-[10px] text-foreground/30 font-medium">({totalRatings} reviews)</span>
             </div>

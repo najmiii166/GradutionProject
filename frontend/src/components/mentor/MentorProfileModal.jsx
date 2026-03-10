@@ -40,6 +40,8 @@ export default function MentorProfileModal({
   onClose,
 }) {
   const [localProfile, setLocalProfile] = useState(profile || {});
+  const [recentRatings, setRecentRatings] = useState([]);
+  const [loadingRatings, setLoadingRatings] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedScore, setSelectedScore] = useState(null);
   const [editName, setEditName] = useState("");
@@ -56,10 +58,34 @@ export default function MentorProfileModal({
     setIdentityPreview(profile?.user?.profileImageUrl || profile?.profileImageUrl || "");
     setIdentityImageFile(null);
     setIdentityImageChanged(false); // reset change flag when modal opens or profile updates
+    setRecentRatings(profile?.recentRatings || []);
   }, [profile, fullName]);
 
   const role = localStorage.getItem("role");
   const mentorId = localProfile.user?._id || localProfile.userId || null;
+
+  React.useEffect(() => {
+    if (!open || !mentorId) return;
+
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoadingRatings(true);
+        const { data } = await api.get(`/mentor/mentors/${mentorId}/ratings`);
+        if (!mounted) return;
+        setRecentRatings(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load mentor ratings", err);
+      } finally {
+        if (mounted) setLoadingRatings(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [open, mentorId]);
 
   const saveIdentity = async () => {
     setSavingIdentity(true);
@@ -121,6 +147,20 @@ export default function MentorProfileModal({
     try {
       const { data } = await api.post(`/mentor/mentors/${mentorId}/rate`, { score });
       setLocalProfile((p) => ({ ...p, averageRating: data.averageRating, totalRatings: data.totalRatings }));
+      setRecentRatings((prev) => {
+        const existing = prev.filter((item) => item.userId !== JSON.parse(localStorage.getItem("user") || "{}")._id);
+        return [
+          {
+            userId: JSON.parse(localStorage.getItem("user") || "{}")._id,
+            userName: "You",
+            userRole: "student",
+            score,
+            comment: "",
+            createdAt: new Date().toISOString(),
+          },
+          ...existing,
+        ];
+      });
       setSelectedScore(score);
     } catch (err) {
       console.error(err);
@@ -194,10 +234,51 @@ export default function MentorProfileModal({
                   <div>
                     <p className="text-[9px] uppercase tracking-widest font-black text-cyan-500/50">Rating</p>
                     <p className="text-xs font-black text-cyan-600">
-                      {localProfile.averageRating ?? 0} <span className="text-[10px] opacity-60">({localProfile.totalRatings ?? 0})</span>
+                      {Number(localProfile.averageRating || 0).toFixed(1)} <span className="text-[10px] opacity-60">({localProfile.totalRatings ?? 0})</span>
                     </p>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[9px] uppercase tracking-[0.2em] font-black text-foreground/30">Recent Ratings</span>
+                  <span className="text-[10px] font-bold text-foreground/35">{localProfile.totalRatings ?? 0} total</span>
+                </div>
+
+                {loadingRatings ? (
+                  <div className="rounded-[1.5rem] border border-border/50 bg-foreground/[0.02] p-4 text-xs text-foreground/40">
+                    Loading ratings...
+                  </div>
+                ) : recentRatings.length > 0 ? (
+                  <div className="space-y-3">
+                    {recentRatings.slice(0, 4).map((item, idx) => (
+                      <div key={`${item.userId || item.createdAt || idx}-${idx}`} className="rounded-[1.5rem] border border-border/50 bg-foreground/[0.02] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground/85">{item.userName || "Anonymous"}</p>
+                            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35">
+                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "Recent"}
+                            </p>
+                          </div>
+                          <div className="inline-flex items-center gap-1 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">
+                            <Star size={12} fill="currentColor" />
+                            {Number(item.score || 0).toFixed(1)}
+                          </div>
+                        </div>
+                        {item.comment ? (
+                          <p className="mt-3 text-xs leading-relaxed text-foreground/65">{item.comment}</p>
+                        ) : (
+                          <p className="mt-3 text-xs italic text-foreground/35">No written comment.</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[1.5rem] border border-dashed border-border/50 bg-foreground/[0.02] p-4 text-xs text-foreground/35">
+                    No session ratings yet.
+                  </div>
+                )}
               </div>
 
               {/* BIO */}

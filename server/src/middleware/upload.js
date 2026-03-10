@@ -1,110 +1,146 @@
 // server/src/middleware/upload.js
 import multer from "multer";
 import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import {
+  createHashedUploadMeta,
+  ensureUploadCategoryDir,
+} from "../utils/uploadStorage.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsRoot = path.join(__dirname, "..", "..", "uploads");
+ensureUploadCategoryDir("idcards");
+ensureUploadCategoryDir("chat");
+ensureUploadCategoryDir("avatars");
 
-function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
+function createStorage(category) {
+  return multer.diskStorage({
+    destination: (_req, file, cb) => {
+      const meta = createHashedUploadMeta(category, {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+      });
+      file.storedRelativePath = meta.relativePath;
+      file.storedAbsolutePath = meta.absolutePath;
+      file.storedPublicUrl = meta.publicUrl;
+      file.storedFileName = meta.fileName;
+      cb(null, meta.absoluteDir);
+    },
+    filename: (_req, file, cb) => {
+      cb(null, file.storedFileName || createHashedUploadMeta(category, file).fileName);
+    },
+  });
 }
 
-const idcardsDir = path.join(uploadsRoot, "idcards");
-const chatDir = path.join(uploadsRoot, "chat");
-const avatarsDir = path.join(uploadsRoot, "avatars");
+function createMimeFilter(allowedMimeTypes, errorMessage) {
+  return (_req, file, cb) => {
+    const mime = String(file.mimetype || "").toLowerCase();
+    const ok = allowedMimeTypes.includes(mime);
+    cb(ok ? null : new Error(errorMessage), ok);
+  };
+}
 
-ensureDir(idcardsDir);
-ensureDir(chatDir);
-ensureDir(avatarsDir);
+const safeImageFileFilter = createMimeFilter(
+  ["image/jpeg", "image/png", "image/webp"],
+  "Only JPG, PNG, and WEBP files are allowed"
+);
+
+const REGISTRATION_IMAGE_MAX_SIZE = 10 * 1024 * 1024;
 
 // ---------------- ID CARD UPLOAD (existing) ----------------
-const idStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, idcardsDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const safeName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}${ext}`;
-    cb(null, safeName);
-  },
-});
-
-const imageFileFilter = (req, file, cb) => {
-  // Allow common image types plus SVG for ID cards (SVG used by some uploads)
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-  const ok = allowed.includes(file.mimetype);
-  cb(ok ? null : new Error("Only JPG/PNG/WEBP/SVG allowed"), ok);
-};
+const idStorage = createStorage("idcards");
 
 export const uploadIdCard = multer({
   storage: idStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: safeImageFileFilter,
+  limits: { fileSize: REGISTRATION_IMAGE_MAX_SIZE },
 });
 
-const avatarStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, avatarsDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const safeName = `avatar-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    cb(null, safeName);
-  },
-});
+const avatarStorage = createStorage("avatars");
 
 export const uploadProfileImage = multer({
   storage: avatarStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: safeImageFileFilter,
+  limits: { fileSize: REGISTRATION_IMAGE_MAX_SIZE },
 });
 
 const registrationIdentityStorage = multer.diskStorage({
   destination: (_req, file, cb) => {
-    const target = file.fieldname === "idCard" ? idcardsDir : avatarsDir;
-    cb(null, target);
+    const category = file.fieldname === "idCard" ? "idcards" : "avatars";
+    const meta = createHashedUploadMeta(category, {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+    });
+    file.storedRelativePath = meta.relativePath;
+    file.storedAbsolutePath = meta.absolutePath;
+    file.storedPublicUrl = meta.publicUrl;
+    file.storedFileName = meta.fileName;
+    cb(null, meta.absoluteDir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const prefix = file.fieldname === "idCard" ? "id" : "avatar";
-    cb(null, `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    cb(null, file.storedFileName);
   },
 });
 
 export const uploadIdentityAssets = multer({
   storage: registrationIdentityStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: safeImageFileFilter,
+  limits: { fileSize: REGISTRATION_IMAGE_MAX_SIZE },
 });
 
 // ---------------- CHAT ATTACHMENT UPLOAD (NEW) ----------------
-const chatStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, chatDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || "";
-    const name = `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}${ext}`;
-    cb(null, name);
-  },
-});
+const chatStorage = createStorage("chat");
+
+const allowedChatMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "audio/webm",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+]);
+
+const allowedChatExtensions = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".webm",
+  ".pdf",
+  ".txt",
+  ".csv",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".zip",
+  ".rar",
+  ".7z",
+]);
 
 const chatFileFilter = (req, file, cb) => {
   const mime = String(file.mimetype || "").toLowerCase();
-  const isImage = mime.startsWith("image/");
-  const isAudioWebm = mime === "audio/webm";
-  const isPdf = mime === "application/pdf";
-  const ok = isImage || isAudioWebm || isPdf;
-  cb(ok ? null : new Error("Only image/*, audio/webm, and PDF files are allowed"), ok);
+  const ext = path.extname(String(file.originalname || "")).toLowerCase();
+  const ok = allowedChatMimeTypes.has(mime) || allowedChatExtensions.has(ext);
+  cb(
+    ok
+      ? null
+      : new Error("Only images, audio/webm, PDF, text, Office, and archive files are allowed"),
+    ok
+  );
 };
 
 export const uploadChatAttachment = multer({

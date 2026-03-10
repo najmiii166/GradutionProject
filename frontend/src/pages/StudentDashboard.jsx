@@ -141,7 +141,7 @@ export default function StudentDashboard() {
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const upcomingRequests = requests.filter((r) => ["upcoming", "ongoing"].includes(r.status));
-  const rejectedRequests = requests.filter((r) => r.status === "rejected");
+  const completedRequests = requests.filter((r) => r.status === "completed");
 
   // Active requests include pending, upcoming and ongoing
   const activeCount = requests.filter((r) => ["pending", "upcoming", "ongoing"].includes(r.status)).length;
@@ -216,9 +216,9 @@ export default function StudentDashboard() {
 
         <KpiCards 
           mentorsCount={mentors.length} 
+          activeCount={activeCount}
           upcomingCount={upcomingRequests.length} 
-          pendingCount={pendingRequests.length} 
-          rejectedCount={rejectedRequests.length} 
+          completedCount={completedRequests.length} 
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

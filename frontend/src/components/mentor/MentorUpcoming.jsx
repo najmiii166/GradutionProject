@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CalendarDays,
@@ -63,10 +63,24 @@ function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh, showBadg
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ scale: 1.01 }}
-      className="group relative rounded-xl border border-border/40 bg-foreground/2 p-5 hover:border-cyan-500/40 hover:bg-foreground/4 transition-all duration-300"
+      className="group relative overflow-hidden rounded-xl border border-border/40 bg-foreground/2 p-5 pt-7 hover:border-cyan-500/40 hover:bg-foreground/4 transition-all duration-300"
     >
+      {showBadge && (
+        <div className="absolute top-0 right-0 z-10">
+          {s.isFollowUp ? (
+            <div className="px-3 py-1 bg-cyan-500/10 border-b border-l border-cyan-500/30 text-[9px] font-black uppercase tracking-widest text-cyan-500 rounded-bl-xl shadow-sm backdrop-blur-md">
+              Follow-up
+            </div>
+          ) : (
+            <div className="px-3 py-1 bg-foreground/5 border-b border-l border-border/40 text-[9px] font-black uppercase tracking-widest text-foreground/50 rounded-bl-xl shadow-sm backdrop-blur-md">
+              New Session
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-between items-start mb-3">
-        <div className="flex gap-3">
+        <div className="flex gap-3 relative z-10">
           <UserAvatar
             src={s.studentProfileImage || ""}
             name={s.studentName || "Student"}
@@ -82,50 +96,39 @@ function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh, showBadg
           </div>
         </div>
 
-        {showJoin ? (
-          <button
-            onClick={() => {
-              try {
-                const win = window.open(
-                  s.meetingLink,
-                  "_blank",
-                  "noopener,noreferrer"
-                );
-                if (win && typeof win.focus === "function") win.focus();
-              } catch {}
-              // Fire-and-forget join tracking; never block navigation
-              try {
-                api.post(`/requests/${s._id}/join`).catch(() => {});
-              } catch {}
-            }}
-            className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
-          >
-            Join Session
-            <ExternalLink className="w-3 h-3" />
-          </button>
-        ) : (
-          // Before window: show disabled join hint; After end: hide join
-          s.meetingLink && joinState === "before" && ["upcoming", "ongoing"].includes(s.status) ? (
-            <span className="text-xs text-slate-400">Available 5 minutes before start</span>
-          ) : null
-        )}
-
-        {showBadge && (
-          <div className="ml-3">
-            {s.isFollowUp ? (
-              <span className="px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-black uppercase tracking-widest text-cyan-600">
-                Follow-up
+        <div className="flex flex-col items-end gap-2 relative z-10 mt-6 md:mt-5 mr-1">
+          {showJoin ? (
+            <button
+              onClick={() => {
+                try {
+                  const win = window.open(
+                    s.meetingLink,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                  if (win && typeof win.focus === "function") win.focus();
+                } catch {}
+                try {
+                  api.post(`/requests/${s._id}/join`).catch(() => {});
+                } catch {}
+              }}
+              className="group/join flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors duration-300"
+            >
+              <span className="group-hover/join:underline underline-offset-4">Join Session</span>
+              <ExternalLink className="w-3.5 h-3.5 group-hover/join:-translate-y-0.5 group-hover/join:translate-x-0.5 transition-transform" />
+            </button>
+          ) : (
+            // Before window: show disabled join hint; After end: hide join
+            s.meetingLink && joinState === "before" && ["upcoming", "ongoing"].includes(s.status) ? (
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 bg-slate-500/10 px-3 py-1.5 rounded-full border border-slate-500/20 text-center shadow-sm">
+                Available 5 min before
               </span>
-            ) : (
-              <span className="px-2 py-1 rounded-full bg-foreground/10 border border-border/40 text-[9px] font-black uppercase tracking-widest text-foreground/60">
-                New Session
-              </span>
-            )}
-          </div>
-        )}
+            ) : null
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mt-4">
+      <div className="grid grid-cols-2 gap-2 mt-4 relative z-10">
         {/* UPDATED: Shows From -> To */}
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-foreground/3 border border-border/20">
           <CalendarDays size={12} className="text-cyan-500/60 shrink-0" />
@@ -154,12 +157,12 @@ function SessionItem({ s, onOpenMeet, onChat, onViewStudent, onRefresh, showBadg
               isOngoing ? "text-emerald-500" : "text-foreground/70"
             }`}
           >
-            {countdown.text}
+            {isOngoing ? "Live Now" : isPast ? "Completed" : countdown.text}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-border/30 flex items-center justify-between">
+      <div className="mt-4 pt-4 border-t border-border/30 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={() => onChat(s.studentId)}
@@ -202,8 +205,21 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
 
   const isValid = useMemo(() => isValidMeetLink(meetingLink), [meetingLink]);
 
-  const visibleSessions = maxVisible ? sessions.slice(0, maxVisible) : sessions;
-  const hasOverflow = maxVisible && sessions.length > maxVisible;
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const activeSessions = useMemo(() => {
+    return sessions.filter(s => new Date(s.endTime) >= now);
+  }, [sessions, now]);
+
+  const visibleSessions = maxVisible ? activeSessions.slice(0, maxVisible) : activeSessions;
+  const hasOverflow = maxVisible && activeSessions.length > maxVisible;
   const gridClass = gridVariant === "multi"
     ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
     : "space-y-4";
@@ -254,7 +270,7 @@ export default function MentorUpcoming({ loading, sessions, onRefresh, onViewStu
               <Spinner className="border-cyan-500" />
               <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Retrieving Schedule...</p>
             </div>
-          ) : sessions.length === 0 ? (
+          ) : activeSessions.length === 0 ? (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

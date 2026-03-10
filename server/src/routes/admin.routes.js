@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/roles.js";
 import User from "../models/User.js";
 import StudentProfile from "../models/StudentProfile.js";
 import MentorProfile from "../models/MentorProfile.js";
+import Feedback from "../models/Feedback.js";
 import Report from "../models/Report.js";
 import Request from "../models/Request.js";
 import { getGlobalMetrics, safeAggregate } from "../utils/metrics.js";
@@ -20,19 +21,8 @@ router.get('/reports/mentors', auth, requireRole('admin'), async (req, res) => {
     const top = parseInt(req.query.top || '5', 10);
     const full = req.query.full === '1' || req.query.full === 'true';
 
-    // Top universities where mentors registered (by MentorProfile.institution)
+    // Top universities where verified mentors are registered (by MentorProfile.institution)
     const mentorUniversities = await safeAggregate(MentorProfile, [
-      { $group: { _id: '$institution', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      ...(full ? [] : [{ $limit: top }]),
-    ]);
-
-    // Top mentors by average rating (use MentorProfile.averageRating) - join user for name
-    const topByRatingAgg = await safeAggregate(MentorProfile, [
-      { $match: { } },
-      { $project: { user: 1, averageRating: 1, totalRatings: 1 } },
-      { $sort: { averageRating: -1, totalRatings: -1 } },
-      ...(full ? [] : [{ $limit: top }]),
       {
         $lookup: {
           from: 'users',
@@ -42,24 +32,80 @@ router.get('/reports/mentors', auth, requireRole('admin'), async (req, res) => {
         }
       },
       { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
-      { $project: { mentorId: '$user', averageRating: 1, totalRatings: 1, name: '$userInfo.fullName', email: '$userInfo.email' } }
+      { $match: { 'userInfo.status': 'verified' } },
+      { $group: { _id: '$institution', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      ...(full ? [] : [{ $limit: top }]),
     ]);
 
-    // Top mentors by accepted requests
+    // Top mentors by student feedback ratings from completed sessions
+    const topByRatingAgg = await safeAggregate(Feedback, [
+      { $match: { raterRole: 'student', rating: { $exists: true, $gt: 0 } } },
+      {
+        $group: {
+          _id: '$mentorId',
+          averageRating: { $avg: '$rating' },
+          totalRatings: { $sum: 1 },
+        }
+      },
+      { $match: { totalRatings: { $gt: 0 } } },
+      { $sort: { averageRating: -1, totalRatings: -1 } },
+      ...(full ? [] : [{ $limit: top }]),
+      {
+        $lookup: {
+          from: 'mentorprofiles',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'mentorProfile',
+        }
+      },
+      { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'mentorProfile.user',
+          foreignField: '_id',
+          as: 'userInfo',
+        }
+      },
+      { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
+      { $match: { 'userInfo.status': 'verified' } },
+      {
+        $project: {
+          mentorId: '$mentorProfile.user',
+          averageRating: { $round: ['$averageRating', 2] },
+          totalRatings: 1,
+          institution: '$mentorProfile.institution',
+          name: '$userInfo.fullName',
+          email: '$userInfo.email'
+        }
+      }
+    ]);
+
+    // Top mentors by accepted requests.
+    // In this system a mentor acceptance usually moves the request directly to
+    // `upcoming` rather than leaving it in `accepted`, so we count all
+    // accepted-session lifecycle statuses here.
     const topByAcceptedAgg = await safeAggregate(Request, [
-      { $match: { status: 'accepted' } },
+      { $match: { status: { $in: ['accepted', 'upcoming', 'ongoing', 'completed', 'expired'] } } },
       { $group: { _id: '$mentorId', accepted: { $sum: 1 } } },
       { $sort: { accepted: -1 } },
       ...(full ? [] : [{ $limit: top }]),
-      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'mentor' } },
+      { $lookup: { from: 'mentorprofiles', localField: '_id', foreignField: '_id', as: 'mentorProfile' } },
+      { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'users', localField: 'mentorProfile.user', foreignField: '_id', as: 'mentor' } },
       { $unwind: { path: '$mentor', preserveNullAndEmptyArrays: true } },
-      { $project: { mentorId: '$_id', accepted: 1, name: '$mentor.fullName', email: '$mentor.email' } }
+      { $match: { 'mentor.status': 'verified' } },
+      { $project: { mentorId: '$mentor._id', accepted: 1, institution: '$mentorProfile.institution', name: '$mentor.fullName', email: '$mentor.email' } }
     ]);
+
+    const bestRatedMentor = topByRatingAgg[0] || null;
 
     return res.json({
       mentorUniversities,
       topByRating: topByRatingAgg,
       topByAccepted: topByAcceptedAgg,
+      bestRatedMentor,
     });
   } catch (err) {
     console.error('Mentor reports error:', err);
@@ -262,7 +308,7 @@ router.get('/reports/users', auth, requireRole('admin'), async (req, res) => {
     const limit = full ? 0 : parseInt(req.query.top || '100', 10);
 
     // build match object: if roleParam is 'mentor' or 'student' restrict, if 'all' or missing, don't filter by role
-    const match = {};
+    const match = { status: 'verified' };
     if (roleParam === 'mentor' || roleParam === 'student') match.role = roleParam;
     if (start || end) match.createdAt = {};
     if (start) match.createdAt.$gte = start;
@@ -320,6 +366,137 @@ router.get('/reports/users', auth, requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error('Users report error:', err);
     return res.status(500).json({ message: 'Failed to compute users report' });
+  }
+});
+
+// ================== REPORTS / SESSIONS ==================
+router.get('/reports/sessions', auth, requireRole('admin'), async (req, res) => {
+  try {
+    const top = parseInt(req.query.top || '12', 10);
+    const start = req.query.start ? new Date(req.query.start) : null;
+    const end = req.query.end ? new Date(req.query.end) : null;
+
+    const dateMatch = {};
+    if (start) dateMatch.$gte = start;
+    if (end) dateMatch.$lte = end;
+
+    const basePipeline = [
+      {
+        $lookup: {
+          from: 'mentorprofiles',
+          localField: 'mentorId',
+          foreignField: '_id',
+          as: 'mentorProfile',
+        }
+      },
+      { $unwind: { path: '$mentorProfile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'mentorProfile.user',
+          foreignField: '_id',
+          as: 'mentorUser',
+        }
+      },
+      { $unwind: { path: '$mentorUser', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'studentUser',
+        }
+      },
+      { $unwind: { path: '$studentUser', preserveNullAndEmptyArrays: true } },
+      { $match: { 'mentorUser.status': 'verified', 'studentUser.status': 'verified' } },
+    ];
+
+    if (Object.keys(dateMatch).length) {
+      basePipeline.push({
+        $match: {
+          $or: [
+            { startTime: dateMatch },
+            { requestedAt: dateMatch },
+          ],
+        }
+      });
+    }
+
+    const summaryAgg = await Request.aggregate([
+      ...basePipeline,
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        }
+      }
+    ]).allowDiskUse(true);
+
+    const statusBreakdown = summaryAgg.map((row) => ({ status: row._id || 'unknown', count: row.count || 0 }));
+    const summary = statusBreakdown.reduce((acc, row) => {
+      acc[row.status] = row.count || 0;
+      return acc;
+    }, { pending: 0, upcoming: 0, ongoing: 0, completed: 0, expired: 0, rejected: 0 });
+
+    const total = Object.values(summary).reduce((sum, count) => sum + Number(count || 0), 0);
+
+    const recentSessions = await Request.aggregate([
+      ...basePipeline,
+      {
+        $project: {
+          _id: 1,
+          status: 1,
+          startTime: 1,
+          endTime: 1,
+          requestedAt: 1,
+          isFollowUp: 1,
+          noShowStatus: 1,
+          meetingLink: 1,
+          studentName: '$studentUser.fullName',
+          studentEmail: '$studentUser.email',
+          studentUniversity: '$studentUser.university',
+          mentorName: '$mentorUser.fullName',
+          mentorEmail: '$mentorUser.email',
+          mentorInstitution: '$mentorProfile.institution',
+        }
+      },
+      { $sort: { startTime: -1, requestedAt: -1 } },
+      { $limit: top },
+    ]).allowDiskUse(true);
+
+    const topMentorsByCompleted = await Request.aggregate([
+      ...basePipeline,
+      { $match: { status: 'completed' } },
+      {
+        $group: {
+          _id: '$mentorProfile.user',
+          mentorName: { $first: '$mentorUser.fullName' },
+          mentorEmail: { $first: '$mentorUser.email' },
+          mentorInstitution: { $first: '$mentorProfile.institution' },
+          completedSessions: { $sum: 1 },
+        }
+      },
+      { $sort: { completedSessions: -1 } },
+      { $limit: 5 },
+    ]).allowDiskUse(true);
+
+    return res.json({
+      summary: {
+        total,
+        pending: summary.pending,
+        upcoming: summary.upcoming,
+        ongoing: summary.ongoing,
+        completed: summary.completed,
+        expired: summary.expired,
+        rejected: summary.rejected,
+      },
+      statusBreakdown,
+      recentSessions,
+      topMentorsByCompleted,
+    });
+  } catch (err) {
+    console.error('Sessions report error:', err);
+    return res.status(500).json({ message: 'Failed to compute sessions report' });
   }
 });
 

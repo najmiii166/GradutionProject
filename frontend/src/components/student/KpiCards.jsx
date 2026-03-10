@@ -1,13 +1,45 @@
 // src/components/student/KpiCards.jsx
 import { motion } from "framer-motion";
-import { Users, Clock, Mail, XCircle } from "lucide-react";
+import { Users, Clock, ListChecks, CheckCircle2 } from "lucide-react";
 
-export default function KpiCards({ mentorsCount, upcomingCount, pendingCount, rejectedCount }) {
+export default function KpiCards({ mentorsCount, activeCount, upcomingCount, completedCount }) {
   const cards = [
-    { icon: Users, label: "Matching Mentors", value: mentorsCount, color: "text-cyan-800 dark:text-cyan-400", glow: "bg-cyan-500/20", bg: "bg-kpi-1" },
-    { icon: Clock, label: "Upcoming Sessions", value: upcomingCount, color: "text-violet-800 dark:text-violet-400", glow: "bg-violet-500/20", bg: "bg-kpi-2" },
-    { icon: Mail, label: "Pending Requests", value: pendingCount, color: "text-amber-800 dark:text-amber-400", glow: "bg-amber-500/20", bg: "bg-kpi-3" },
-    { icon: XCircle, label: "Rejected Requests", value: rejectedCount, color: "text-rose-800 dark:text-rose-400", glow: "bg-rose-500/20", bg: "bg-kpi-4" },
+    {
+      icon: Users,
+      label: "Available Mentors",
+      value: mentorsCount,
+      hint: "Matched to your focus areas",
+      color: "text-cyan-800 dark:text-cyan-400",
+      glow: "bg-cyan-500/20",
+      bg: "bg-kpi-1",
+    },
+    {
+      icon: ListChecks,
+      label: "Active Requests",
+      value: activeCount,
+      hint: "Pending or currently in progress",
+      color: "text-violet-800 dark:text-violet-400",
+      glow: "bg-violet-500/20",
+      bg: "bg-kpi-2",
+    },
+    {
+      icon: Clock,
+      label: "Upcoming Sessions",
+      value: upcomingCount,
+      hint: "Ready to join soon",
+      color: "text-amber-800 dark:text-amber-400",
+      glow: "bg-amber-500/20",
+      bg: "bg-kpi-3",
+    },
+    {
+      icon: CheckCircle2,
+      label: "Completed Sessions",
+      value: completedCount,
+      hint: "Finished mentorship sessions",
+      color: "text-rose-800 dark:text-rose-400",
+      glow: "bg-rose-500/20",
+      bg: "bg-kpi-4",
+    },
   ];
 
   return (
@@ -33,6 +65,11 @@ export default function KpiCards({ mentorsCount, upcomingCount, pendingCount, re
               <p className="text-3xl font-bold tracking-tight">
                 {c.value}
               </p>
+              {c.hint ? (
+                <p className="mt-2 text-[11px] text-foreground/55 dark:text-foreground/50 font-medium">
+                  {c.hint}
+                </p>
+              ) : null}
             </div>
             
             <div className={`p-3 rounded-xl bg-white/40 dark:bg-white/5 ${c.color} shadow-sm backdrop-blur-sm`}>

@@ -80,6 +80,14 @@ export default function HistoryPage() {
     [data]
   );
 
+  const hasFilteredSessions = useMemo(() => {
+    if (filter === "all") return hasAnySessions;
+
+    return Object.values(data).some(
+      (arr) => Array.isArray(arr) && arr.some((session) => session.status === filter)
+    );
+  }, [data, filter, hasAnySessions]);
+
   if (loading) {
     return (
       <div className="relative min-h-screen bg-background text-foreground/40">
@@ -202,6 +210,28 @@ export default function HistoryPage() {
             <Activity className="w-12 h-12 text-foreground/10 mx-auto mb-4" />
             <p className="text-sm font-medium text-foreground/40 italic font-serif">
               "No historical data detected in current node parameters."
+            </p>
+          </motion.div>
+        )}
+
+        {hasAnySessions && !hasFilteredSessions && filter !== "all" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-[2.5rem] border border-border/30 bg-card/30 p-20 text-center backdrop-blur-sm"
+          >
+            {filter === "completed" ? (
+              <CheckCircle className="mx-auto mb-4 h-12 w-12 text-emerald-500/20" />
+            ) : (
+              <XCircle className="mx-auto mb-4 h-12 w-12 text-rose-500/20" />
+            )}
+            <p className="text-lg font-semibold text-foreground/70">
+              No {filter} sessions found.
+            </p>
+            <p className="mt-2 text-sm text-foreground/40">
+              {filter === "completed"
+                ? "Completed sessions will appear here after a mentorship meeting finishes successfully."
+                : "Expired sessions will appear here when a scheduled session ends without completion."}
             </p>
           </motion.div>
         )}

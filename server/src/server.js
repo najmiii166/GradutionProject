@@ -97,7 +97,9 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 const uploadsRoot = path.join(__dirname, "..", "uploads");
-app.use("/uploads/idcards", express.static(path.join(uploadsRoot, "idcards")));
+app.use("/uploads/idcards", (_req, res) => {
+  return res.status(403).json({ message: "Direct ID card access denied" });
+});
 app.use("/uploads/avatars", express.static(path.join(uploadsRoot, "avatars")));
 app.use("/uploads/chat", (_req, res) => {
   return res.status(403).json({ message: "Direct chat attachment access denied" });

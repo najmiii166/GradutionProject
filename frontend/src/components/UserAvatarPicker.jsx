@@ -27,6 +27,7 @@ export default function UserAvatarPicker({
   const [preview, setPreview] = useState(initialSrc || "");
   const [isDragging, setIsDragging] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState("");
 
   const inputRef = useRef(null);
@@ -42,11 +43,24 @@ export default function UserAvatarPicker({
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+
+    if (videoRef.current) {
+      videoRef.current.pause?.();
+      videoRef.current.srcObject = null;
+    }
   };
 
   useEffect(() => {
     return () => stopCamera();
   }, []);
+
+  useEffect(() => {
+    if (!cameraOpen || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+    video.play().catch(() => {});
+  }, [cameraOpen]);
 
   const handleFile = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -55,19 +69,37 @@ export default function UserAvatarPicker({
     onChange?.(file, dataUrl);
   };
 
+  const closeCameraModal = () => {
+    setCameraOpen(false);
+    setCameraLoading(false);
+    stopCamera();
+  };
+
   const openCamera = async () => {
     setCameraError("");
+    setCameraLoading(true);
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setCameraLoading(false);
+      setCameraError("This device or browser does not support camera capture.");
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
       streamRef.current = stream;
       setCameraOpen(true);
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      }, 0);
+      setCameraLoading(false);
     } catch {
+      stopCamera();
+      setCameraLoading(false);
       setCameraError("Camera access was blocked. Please allow camera permission.");
     }
   };
@@ -75,17 +107,26 @@ export default function UserAvatarPicker({
   const captureFrame = async () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setCameraError("Camera preview is not ready yet. Please wait a moment and try again.");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setCameraError("Failed to capture the image. Please try again.");
+      return;
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/png", 0.95);
     const file = await dataUrlToFile(dataUrl, `avatar-${Date.now()}.png`);
     setPreview(dataUrl);
     onChange?.(file, dataUrl);
-    setCameraOpen(false);
-    stopCamera();
+    closeCameraModal();
   };
 
   return (
@@ -121,9 +162,10 @@ export default function UserAvatarPicker({
               <button
                 type="button"
                 onClick={openCamera}
+                disabled={cameraLoading}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-foreground/[0.05] border border-border text-xs font-medium hover:bg-foreground/[0.08]"
               >
-                <Camera size={14} /> Capture
+                <Camera size={14} /> {cameraLoading ? "Opening..." : "Capture"}
               </button>
               {preview && (
                 <button
@@ -162,28 +204,54 @@ export default function UserAvatarPicker({
       {cameraError && <p className="text-xs text-rose-500">{cameraError}</p>}
 
       {cameraOpen && (
-        <div className="rounded-2xl border border-border bg-background p-3 space-y-3">
-          <div className="rounded-xl overflow-hidden border border-border bg-black/70">
-            <video ref={videoRef} className="w-full h-52 object-cover" muted playsInline />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCameraOpen(false);
-                stopCamera();
-              }}
-              className="px-3 py-2 rounded-xl border border-border text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={captureFrame}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-cyan-500 text-white text-xs font-bold"
-            >
-              <Video size={14} /> Use Snapshot
-            </button>
+        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-background/70 p-4 backdrop-blur-md">
+          <div
+            className="absolute inset-0"
+            onClick={closeCameraModal}
+            aria-hidden="true"
+          />
+
+          <div className="relative w-full max-w-2xl rounded-[2rem] border border-border/50 bg-card/95 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-500">Camera Capture</p>
+                <h3 className="mt-2 text-xl font-semibold text-foreground">Preview your avatar before saving</h3>
+                <p className="mt-1 text-sm text-foreground/45">Center your face in the frame, then capture the photo.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCameraModal}
+                className="rounded-2xl border border-border/60 bg-background/70 p-2 text-foreground/55 transition-all hover:text-foreground"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-hidden rounded-[1.5rem] border border-border/50 bg-black">
+              <video ref={videoRef} className="h-[320px] w-full object-cover sm:h-[420px]" muted playsInline autoPlay />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-foreground/45">
+                The captured image will be used as your avatar.
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeCameraModal}
+                  className="rounded-2xl border border-border/60 px-4 py-2.5 text-xs font-semibold text-foreground/65 transition-all hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={captureFrame}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white transition-all hover:bg-cyan-400"
+                >
+                  <Video size={14} /> Capture Photo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
