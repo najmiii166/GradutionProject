@@ -1,4 +1,4 @@
-import { brandColor, buildBrandedEmail } from "./brandedEmailLayout.js";
+import { buildBrandedEmail } from "./brandedEmailLayout.js";
 
 export const accountApprovedEmail = ({ name, role, loginUrl }) => {
   const safeName = name || "there";

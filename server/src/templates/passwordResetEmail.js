@@ -1,84 +1,30 @@
+import { buildBrandedEmail } from "./brandedEmailLayout.js";
+
 export const passwordResetEmail = ({ name, resetUrl }) => {
   const safeName = name || "there";
-  const brandColor = process.env.BRAND_COLOR_HEX || "#0ea5e9";
-  
-  // Cleaned and optimized for Email Clients (Gmail/Outlook)
-  const logoSvg = `
-    <svg 
-      viewBox="0 0 32 32" 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="48" 
-      height="48" 
-      style="display:block; margin: 0 auto; color: ${brandColor};" 
-      fill="currentColor"
-    >
-      <path d="M28.76,20.14c-0.74-0.73-1.7-1.15-2.73-1.21l-0.02-0.11l-1.25-7l-0.12-0.65c0.54-0.71,0.83-1.58,0.83-2.48 c0-1.11-0.44-2.16-1.24-2.95c-0.8-0.79-1.86-1.22-2.99-1.22c-1.13,0-2.19,0.43-2.99,1.22c-0.8,0.79-1.24,1.84-1.24,2.95 c0,0.87,0.27,1.7,0.77,2.4l-1.41,7.87c-0.13-0.01-0.26-0.02-0.39-0.02c-0.11,0-0.21,0-0.32,0.01l-2.89-8.16 c0.14-0.23,0.26-0.47,0.35-0.71v-0.01c0.17-0.46,0.26-0.94,0.26-1.44V8.59c0-1.11-0.44-2.15-1.24-2.94 c-0.8-0.79-1.86-1.22-2.99-1.22c-1.13,0-2.19,0.43-2.99,1.22C5.39,6.44,4.95,7.49,4.95,8.6c0,0.87,0.27,1.7,0.77,2.4c0,0,0,0,0,0 l-1.5,8.37h0C2.9,20.09,2,21.46,2,23.04c0,2.3,1.9,4.17,4.23,4.17c2.33,0,4.23-1.87,4.23-4.17c0-2.11-1.59-3.86-3.66-4.13l1.13-6.32 c0.4,0.12,0.82,0.18,1.25,0.18c0.48,0,0.95-0.08,1.39-0.23l2.63,7.43c-0.03,0.03-0.06,0.05-0.09,0.08 c-0.82,0.76-1.34,1.84-1.34,3.04c0,2.3,1.9,4.17,4.23,4.17c2.33,0,4.23-1.87,4.23-4.17c0-1.28-0.59-2.43-1.51-3.2L20,12.66 c0.4,0.12,0.82,0.18,1.25,0.18c0.12,0,0.23,0,0.35-0.02c0.22-0.02,0.44-0.05,0.66-0.1c0.06-0.01,0.11-0.03,0.17-0.05l0.01,0.05 l1.21,6.75c-0.16,0.09-0.31,0.19-0.46,0.31c-0.14,0.1-0.27,0.22-0.4,0.34c-0.06,0.06-0.12,0.13-0.18,0.19 c-0.68,0.76-1.06,1.73-1.06,2.76c0,1.11,0.44,2.16,1.24,2.95c0.8,0.79,1.86,1.22,2.99,1.22c1.13,0,2.19-0.44,2.99-1.22 c0.8-0.79,1.24-1.84,1.24-2.95C30,21.97,29.56,20.92,28.76,20.14z M9.79,23.04c0,1.94-1.6,3.51-3.56,3.51s-3.56-1.58-3.56-3.51 c0-1.87,1.48-3.4,3.35-3.51c0.07,0,0.14-0.01,0.22-0.01c0.15,0,0.3,0.01,0.45,0.03C8.43,19.78,9.79,21.26,9.79,23.04z M6.13,18.88 c-0.41,0.01-0.81,0.08-1.18,0.19l1.33-7.43c0.31,0.29,0.65,0.52,1.02,0.69L6.13,18.88z M8.04,11.93c-0.22-0.07-0.43-0.16-0.62-0.28 c-0.27-0.15-0.53-0.34-0.76-0.57c-1.39-1.37-1.39-3.6,0-4.97c0.69-0.69,1.6-1.03,2.52-1.03c0.91,0,1.82,0.34,2.52,1.03 c1.03,1.02,1.3,2.51,0.79,3.78c-0.1,0.25-0.23,0.49-0.39,0.71c-0.03,0.04-0.06,0.09-0.09,0.13c-0.09,0.12-0.2,0.24-0.31,0.35 c-0.05,0.05-0.11,0.1-0.16,0.15c-0.17,0.14-0.35,0.27-0.53,0.38l-0.66,0.3C9.59,12.18,8.78,12.18,8.04,11.93z M11.23,12.25 c0.15-0.08,0.3-0.17,0.44-0.27c0.17-0.13,0.34-0.27,0.5-0.42c0.03-0.03,0.06-0.06,0.09-0.09c0,0,0.01-0.01,0.01-0.01l2.69,7.59 c-0.07,0.02-0.13,0.03-0.2,0.05c-0.33,0.1-0.65,0.25-0.94,0.43L11.23,12.25z M19.56,23.09c0,1.94-1.59,3.51-3.56,3.51 c-1.96,0-3.56-1.58-3.56-3.51c0-0.94,0.38-1.8,1-2.44c0.18-0.18,0.38-0.35,0.59-0.49c0.26-0.17,0.54-0.31,0.84-0.41 c0.1-0.03,0.2-0.06,0.3-0.08c0.11-0.03,0.23-0.05,0.35-0.07c0.13-0.02,0.26-0.03,0.39-0.03c0.03,0,0.06,0,0.09,0 c0.09,0,0.18,0,0.27,0.01l0.65,0.11C18.45,20.1,19.56,21.46,19.56,23.09z M18.11,19.48c-0.33-0.19-0.69-0.34-1.07-0.43l1.31-7.34 c0.31,0.29,0.65,0.52,1.02,0.7L18.11,19.48z M22.14,12.08c-0.22,0.05-0.44,0.09-0.66,0.1c-0.46,0.03-0.92-0.03-1.36-0.17l-0.63-0.28 c-0.27-0.15-0.53-0.34-0.76-0.57c-1.39-1.37-1.39-3.6,0-4.97c0.69-0.69,1.6-1.03,2.52-1.03c0.91,0,1.82,0.34,2.52,1.03 c1.38,1.36,1.39,3.58,0.02,4.95c0,0.01-0.01,0.01-0.02,0.02c-0.18,0.17-0.37,0.33-0.57,0.46C22.87,11.83,22.51,11.98,22.14,12.08z M23.09,12.63l-0.03-0.19c0.09-0.04,0.18-0.09,0.26-0.13c0.21-0.11,0.41-0.25,0.6-0.41c0.05-0.04,0.1-0.09,0.16-0.13l0.08,0.45 l1.2,6.72c-0.17,0.02-0.34,0.04-0.5,0.08c-0.2,0.04-0.41,0.1-0.6,0.18L23.09,12.63z M28.29,25.57c-1.39,1.37-3.65,1.37-5.04,0 c-1.39-1.37-1.39-3.6,0-4.97c0.16-0.16,0.33-0.29,0.51-0.42l0.61-0.33c0.19-0.08,0.39-0.14,0.59-0.19c0.17-0.04,0.33-0.06,0.5-0.08 c0.08-0.01,0.17-0.01,0.25-0.01c0,0,0,0,0,0h0.04c0.91,0,1.82,0.34,2.52,1.03C29.68,21.97,29.68,24.2,28.29,25.57z" />
-    </svg>
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">
+      We received a request to reset your password. To keep your account secure, this link is only valid for the next <strong>20 minutes</strong>.
+    </p>
+    <p style="margin:0;">
+      Click the button below to choose a new password. If you didn't request this, you can safely ignore this email.
+    </p>
   `;
 
-  return `<!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Password Reset</title>
-      <style>
-        @media (max-width: 600px) {
-          .card { padding: 32px 20px !important; border-radius: 24px !important; }
-          .btn { width: 100% !important; text-align: center; }
-        }
-      </style>
-    </head>
-    <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-        <tr>
-          <td align="center">
-            <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="card" style="background:#ffffff;border-radius:40px;padding:48px;box-shadow:0 10px 40px rgba(0,0,0,0.04);border:1px solid #f1f5f9;">
-              <tr>
-                <td align="center" style="padding-bottom:32px;">
-                  ${logoSvg}
-                  <h1 style="margin:12px 0 0 0; font-size:24px; font-weight:300; letter-spacing:-0.02em; color:#0f172a;">
-                    Mentor<span style="color:${brandColor}; font-weight:600;">Link</span>
-                  </h1>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-size:16px; line-height:1.6; color:#475569; padding-bottom:24px;">
-                  <p style="margin:0 0 16px 0;">Hello ${safeName},</p>
-                  <p style="margin:0 0 16px 0;">
-                    We received a request to reset your password. To keep your account secure, this link is only valid for the next <strong>20 minutes</strong>.
-                  </p>
-                  <p style="margin:0;">
-                    Click the button below to choose a new password. If you didn't request this, you can safely ignore this email.
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <td align="center" style="padding-top:8px; padding-bottom:40px;">
-                  <a class="btn" href="${resetUrl}" style="display:inline-block; padding:16px 40px; border-radius:16px; font-weight:600; font-size:15px; color:#ffffff; background:${brandColor}; text-decoration:none; box-shadow:0 10px 15px -3px rgba(14, 165, 233, 0.3);">
-                    Reset Your Password
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-size:13px; line-height:1.6; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:24px;">
-                  <p style="margin:0;">
-                    <strong>Security Tip:</strong> Never share your reset link with anyone. Our team will never ask for your password or reset link via email or social media.
-                  </p>
-                </td>
-              </tr>
-            </table>
-            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-              <tr>
-                <td align="center" style="font-size:12px; color:#94a3b8; line-height:1.5;">
-                  <p style="margin:0;">© ${new Date().getFullYear()} MentorLink. All rights reserved.</p>
-                  <p style="margin:4px 0 0 0;">Expertise Meets Ambition.</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-  </html>`;
+  const footerHtml = `
+    <p style="margin:0;">
+      <strong>Security Tip:</strong> Never share your reset link with anyone. Our team will never ask for your password or reset link via email or social media.
+    </p>
+  `;
+
+  return buildBrandedEmail({
+    safeName,
+    title: "Reset your MentorLink password",
+    metaTitle: "Password Reset",
+    bodyHtml,
+    buttonLabel: "Reset Your Password",
+    buttonUrl: resetUrl,
+    footerHtml,
+  });
 };
