@@ -146,7 +146,7 @@ export default function Sidebar({ activePage, setActivePage, navigate }) {
       >
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-3 w-7 h-7 rounded-lg bg-sidebar-foreground/10 border border-border text-sidebar-foreground flex items-center justify-center z-[60] shadow-md hover:bg-sidebar-foreground/15 transition-all"
+          className="absolute -right-3 top-6 w-7 h-7 rounded-lg bg-card border border-border text-foreground flex items-center justify-center z-[60] shadow-md hover:text-cyan-500 hover:border-cyan-500/50 transition-all"
         >
           {isCollapsed ? (
             <PanelLeftOpen size={16} />

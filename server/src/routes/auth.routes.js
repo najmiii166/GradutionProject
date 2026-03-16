@@ -6,6 +6,7 @@ import multer from "multer";
 import rateLimit from "express-rate-limit";
 import csrf from "csurf";
 import { validationResult } from "express-validator";
+import * as deepEmailValidator from "deep-email-validator";
 
 import User from "../models/User.js";
 import MentorProfile from "../models/MentorProfile.js";
@@ -58,6 +59,44 @@ const cleanupUploadedFiles = (files = []) => {
 };
 
 const STUDENT_REREGISTRATION_STATUSES = new Set(["pending", "unverified"]);
+const BASIC_EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+const verifyEmailMailbox = async (email) => {
+  if (!BASIC_EMAIL_RE.test(String(email || "").trim())) {
+    return {
+      ok: false,
+      reason: "invalid_format",
+    };
+  }
+
+  try {
+    const result = await deepEmailValidator.validate({
+      email,
+      sender: process.env.EMAIL_VALIDATION_SENDER || process.env.SMTP_FROM || "noreply@mentorlink.app",
+      validateRegex: true,
+      validateMx: true,
+      validateTypo: false,
+      validateDisposable: false,
+      validateSMTP: true,
+    });
+
+    if (!result?.valid) {
+      return {
+        ok: false,
+        reason: result?.reason || "smtp_rejected",
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error("Deep email validation failed:", error);
+    return {
+      ok: false,
+      reason: "validation_unavailable",
+      unavailable: true,
+    };
+  }
+};
 
 const handleUploadError = (err, req, res) => {
   if (!err) return false;
@@ -424,9 +463,14 @@ router.post("/login", loginRules, async (req, res) => {
 router.post("/check-email", async (req, res) => {
   try {
     const { email, role } = req.body || {};
-    if (!email) return res.status(400).json({ message: "Email is required" });
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    if (!normalizedEmail) return res.status(400).json({ message: "Email is required" });
 
-    const existing = await User.findOne({ email });
+    if (!BASIC_EMAIL_RE.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Please enter a valid email format" });
+    }
+
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       const requestedRole = String(role || "").trim().toLowerCase();
       const canReuseStudentEmail =
@@ -444,7 +488,22 @@ router.post("/check-email", async (req, res) => {
       }
     }
 
-    return res.json({ message: "Email available" });
+    const mailboxCheck = await verifyEmailMailbox(normalizedEmail);
+    if (!mailboxCheck.ok) {
+      if (mailboxCheck.unavailable) {
+        return res.status(503).json({
+          code: "EMAIL_CHECK_UNAVAILABLE",
+          message: "Unable to verify email right now. Please try again.",
+        });
+      }
+
+      return res.status(422).json({
+        code: "EMAIL_NOT_EXIST",
+        message: "Email does not exist.",
+      });
+    }
+
+    return res.json({ message: "Email available", valid: true });
   } catch (err) {
     console.error("/auth/check-email error:", err);
     return res.status(500).json({ message: "Server error" });

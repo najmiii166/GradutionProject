@@ -27,6 +27,7 @@ import {
 export default function StudentRegister() {
   const [step, setStep] = useState(1);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [emailValidationError, setEmailValidationError] = useState("");
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -54,6 +55,9 @@ export default function StudentRegister() {
 
   const update = (e) => {
     const { name, value } = e.target;
+    if (name === "email" && emailValidationError) {
+      setEmailValidationError("");
+    }
     if (name === "semester") {
       // convert to number and clamp between 1 and 10
       let num = parseInt(value, 10);
@@ -82,11 +86,20 @@ export default function StudentRegister() {
       return;
     }
     if (!strongRe.test(form.password)) return; // Logic handled by inline feedback
+    setEmailValidationError("");
     setCheckingEmail(true);
     try {
       await api.post("/auth/check-email", { email: form.email, role: "student" });
       setStep(2);
     } catch (err) {
+      if (err.response?.data?.code === "EMAIL_NOT_EXIST") {
+        setEmailValidationError("Email does not exist.");
+        return;
+      }
+      if (err.response?.status === 409) {
+        setEmailValidationError("Email already in use.");
+        return;
+      }
       setToast(err.response?.data?.message || "Email is already in use");
     } finally {
       setCheckingEmail(false);
@@ -198,8 +211,19 @@ export default function StudentRegister() {
 
                     <div className="relative group">
                       <Mail className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
-                      <input type="email" name="email" placeholder="Email Address" value={form.email} onChange={update} required className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all" />
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Email Address"
+                        value={form.email}
+                        onChange={update}
+                        required
+                        className={`w-full rounded-2xl border bg-background px-12 py-3 text-sm outline-none transition-all ${emailValidationError ? 'border-red-500 focus:ring-1 focus:ring-red-500/40' : 'border-border focus:ring-1 focus:ring-cyan-500/50'}`}
+                      />
                     </div>
+                    {emailValidationError && (
+                      <p className="-mt-3 text-[11px] font-medium text-red-500 px-1">{emailValidationError}</p>
+                    )}
 
                     <div className="space-y-2">
                       <div className="relative group">

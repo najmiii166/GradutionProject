@@ -52,6 +52,7 @@ export default function MentorRegister() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [emailValidationError, setEmailValidationError] = useState("");
   const [toast, setToast] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
@@ -79,7 +80,12 @@ export default function MentorRegister() {
   );
   const [newSlot, setNewSlot] = useState({ day: DAYS[0].key, from: "09:00", to: "10:00" });
 
-  const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const update = (e) => {
+    if (e.target.name === "email" && emailValidationError) {
+      setEmailValidationError("");
+    }
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   // Step 1 Validation & Email Check
   const isStep1Valid = useMemo(() => {
@@ -91,12 +97,21 @@ export default function MentorRegister() {
   }, [form]);
 
   const handleStep1Submit = async () => {
+    setEmailValidationError("");
     setCheckingEmail(true);
     try {
       // Check if email exists
-      await api.post("/auth/check-email", { email: form.email });
+      await api.post("/auth/check-email", { email: form.email, role: "mentor" });
       setStep(2);
     } catch (err) {
+      if (err.response?.data?.code === "EMAIL_NOT_EXIST") {
+        setEmailValidationError("Email does not exist.");
+        return;
+      }
+      if (err.response?.status === 409) {
+        setEmailValidationError("Email already in use.");
+        return;
+      }
       setToast(err.response?.data?.message || "Email is already in use");
     } finally {
       setCheckingEmail(false);
@@ -280,8 +295,18 @@ export default function MentorRegister() {
                   </div>
                   <div className="relative">
                     <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <input type="email" name="email" placeholder="Email address" value={form.email} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Email address"
+                      value={form.email}
+                      onChange={update}
+                      className={`w-full bg-background/50 border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${emailValidationError ? 'border-red-500' : 'border-border'}`}
+                    />
                   </div>
+                  {emailValidationError && (
+                    <p className="-mt-2 text-[11px] font-medium text-red-500 px-1">{emailValidationError}</p>
+                  )}
                   <div className="relative">
                     <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
                     <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" value={form.password} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-12 py-3.5 text-sm outline-none" />
