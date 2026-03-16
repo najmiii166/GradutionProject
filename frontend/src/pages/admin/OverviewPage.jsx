@@ -5,7 +5,7 @@ import { api } from "../../api/axios";
 import DetailsModal from "../../components/admin/DetailsModal";
 import StatCard from "../../components/admin/StatCard";
 import ChartBox from "../../components/admin/ChartBox";
-import { Users, GraduationCap, Clock, TrendingUp, BarChart3, Star } from "lucide-react";
+import { Users, GraduationCap, Clock, TrendingUp, BarChart3, Star, Layers, CalendarClock, PlayCircle, CheckCircle2, XOctagon } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -63,7 +63,8 @@ export default function OverviewPage({ stats, analytics }) {
     .filter(item => item._id && item.count)
     .map(item => ({
       name: facultyNameMap[item._id] || item._id,
-      count: item.count,
+      students: item.count,
+      mentors: 0,
     }));
 
   // Student area (mentorshipAreas) -- fetched from admin drilldown if not supplied
@@ -81,14 +82,28 @@ export default function OverviewPage({ stats, analytics }) {
   // re-fetch helpers
   const fetchOverview = async () => {
     try {
-      const [a, t, m, s] = await Promise.all([
+      const [a, mAreasRes, t, m, s] = await Promise.all([
         api.get('/admin/reports/drilldown/students', { params: { type: 'topStudentAreas', top: 8 } }),
+        api.get('/admin/reports/drilldown/mentors', { params: { type: 'topMentorAreas', top: 8 } }),
         api.get('/admin/reports/top-mentor-sessions', { params: { top: 8 } }),
         api.get('/admin/reports/mentors', { params: { top: 1 } }),
         api.get('/admin/reports/sessions', { params: { top: 1 } }),
       ]);
-      const rows = a.data?.rows || [];
-      setStudentAreas(rows.map(r => ({ name: areaNameMap[r._id] || (r._id || '').replace(/_/g, ' '), count: r.count })));
+      
+      const sRows = a.data?.rows || [];
+      const mRows = mAreasRes.data?.rows || [];
+      
+      const mergedAreas = {};
+      sRows.forEach(r => {
+        if (r._id) mergedAreas[r._id] = { name: areaNameMap[r._id] || r._id.replace(/_/g, ' '), students: r.count, mentors: 0 };
+      });
+      mRows.forEach(r => {
+        if (r._id) {
+          if (mergedAreas[r._id]) mergedAreas[r._id].mentors = r.count;
+          else mergedAreas[r._id] = { name: areaNameMap[r._id] || r._id.replace(/_/g, ' '), students: 0, mentors: r.count };
+        }
+      });
+      setStudentAreas(Object.values(mergedAreas).sort((x, y) => (y.students + y.mentors) - (x.students + x.mentors)).slice(0, 8));
 
       setTopCompleted(t.data?.topCompleted || []);
       setTopExpired(t.data?.topExpired || []);
@@ -192,109 +207,146 @@ export default function OverviewPage({ stats, analytics }) {
     <motion.section 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      // Removed h-full scroll to let it breathe, but kept max-width for large screens
-      className="p-4 md:p-6 flex flex-col gap-6 w-full max-w-[1600px] mx-auto"
+      className="p-3 md:p-4 flex flex-col gap-4 w-full max-w-[1600px] mx-auto"
     >
-      {/* 1. Compact Stats Grid (Now the top of the page) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard 
-          index={0} 
-          title="Total Students" 
-          value={stats.totalStudents} 
-          icon={<Users size={20} className="stroke-[2.5px]" />}
-          bg="bg-kpi-1"
-          textColor="text-cyan-800 dark:text-cyan-400"
-          glow="bg-cyan-500/20"
-        />
-        <StatCard 
-          index={1} 
-          title="Total Mentors" 
-          value={stats.totalMentors} 
-          icon={<GraduationCap size={20} className="stroke-[2.5px]" />}
-          bg="bg-kpi-2"
-          textColor="text-violet-800 dark:text-violet-400"
-          glow="bg-violet-500/20"
-        />
-        <StatCard 
-          index={2} 
-          title="Pending Accounts" 
-          value={stats.totalPending} 
-          icon={<Clock size={20} className="stroke-[2.5px]" />}
-          bg="bg-kpi-3"
-          textColor="text-amber-800 dark:text-amber-400"
-          glow="bg-amber-500/20"
-        />
-      </div>
+      {/* Top Section: Stats Left, Top Mentor Right */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mb-4">
+        
+        {/* Left Side: Main Stats & Session Summaries */}
+        <div className="xl:col-span-3 flex flex-col gap-4 justify-between h-full">
+          {/* Main Users Stats Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard 
+              index={0} 
+              title="Total Students" 
+              value={stats.totalStudents} 
+              icon={<Users size={20} className="stroke-[2.5px]" />}
+              bg="bg-kpi-1"
+              textColor="text-cyan-800 dark:text-cyan-400"
+              glow="bg-cyan-500/20"
+            />
+            <StatCard 
+              index={1} 
+              title="Total Mentors" 
+              value={stats.totalMentors} 
+              icon={<GraduationCap size={20} className="stroke-[2.5px]" />}
+              bg="bg-kpi-2"
+              textColor="text-violet-800 dark:text-violet-400"
+              glow="bg-violet-500/20"
+            />
+            <StatCard 
+              index={2} 
+              title="Pending Accounts" 
+              value={stats.totalPending} 
+              icon={<Clock size={20} className="stroke-[2.5px]" />}
+              bg="bg-kpi-3"
+              textColor="text-amber-800 dark:text-amber-400"
+              glow="bg-amber-500/20"
+            />
+          </div>
 
-      <div className="rounded-[2rem] border border-cyan-500/15 bg-gradient-to-br from-cyan-500/10 via-card to-transparent p-5 shadow-lg">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
-              <Star size={15} />
-              <span className="text-[10px] font-black uppercase tracking-[0.22em]">Top Rated Verified Mentor</span>
+          {/* Sessions Summary Row */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="rounded-[1.2rem] border border-border/50 bg-card/70 px-4 py-3.5 shadow-sm backdrop-blur-md flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 opacity-70">
+                <Layers size={13} className="text-foreground shrink-0" />
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-foreground line-clamp-1" title="Total Sessions">Total Sessions</p>
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-foreground/90 leading-none">{sessionSummary.total || 0}</p>
             </div>
-            <h3 className="mt-3 text-2xl font-semibold text-foreground/90">
-              {topRatedMentor?.name || "No rated mentor available yet"}
+            <div className="rounded-[1.2rem] border border-violet-500/15 bg-violet-500/5 px-4 py-3.5 shadow-sm backdrop-blur-md flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 opacity-80">
+                <CalendarClock size={13} className="text-violet-500 shrink-0" />
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-600 line-clamp-1" title="Upcoming Sessions">Upcoming   </p>
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-violet-600 leading-none">{sessionSummary.upcoming || 0}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-cyan-500/15 bg-cyan-500/5 px-4 py-3.5 shadow-sm backdrop-blur-md flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 opacity-80">
+                <PlayCircle size={13} className="text-cyan-500 shrink-0" />
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-cyan-600 line-clamp-1" title="Ongoing Sessions">Ongoing </p>
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-cyan-600 leading-none">{sessionSummary.ongoing || 0}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-emerald-500/15 bg-emerald-500/5 px-4 py-3.5 shadow-sm backdrop-blur-md flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 opacity-80">
+                <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600 line-clamp-1" title="Completed Sessions">Completed </p>
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-emerald-600 leading-none">{sessionSummary.completed || 0}</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-rose-500/15 bg-rose-500/5 px-4 py-3.5 shadow-sm backdrop-blur-md flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 opacity-80">
+                <XOctagon size={13} className="text-rose-500 shrink-0" />
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-rose-600 line-clamp-1" title="Expired Sessions">Expired </p>
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-rose-600 leading-none">{sessionSummary.expired || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Top Mentor Vertically Long */}
+        <div className="xl:col-span-1 border border-cyan-500/15 bg-gradient-to-b from-cyan-500/10 via-card to-transparent rounded-[1.2rem] p-4 shadow-sm flex flex-col justify-between items-center text-center relative overflow-hidden h-full">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full z-0"></div>
+          
+          <div className="w-10 h-10 rounded-full hidden xl:flex bg-cyan-500/10 items-center justify-center mb-1.5 shadow-inner z-10 shrink-0">
+            <Star size={18} className="fill-cyan-500/40 text-cyan-500" />
+          </div>
+          
+          <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1 xl:hidden z-10 shrink-0">
+            <Star size={12} className="fill-cyan-500/20" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Top Rated Mentor</span>
+          </div>
+          
+          <span className="hidden xl:block text-[8px] font-black uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-400 mb-1.5 z-10 shrink-0">
+            Top Rated Mentor
+          </span>
+          
+          <div className="flex flex-col items-center justify-center w-full px-1 min-h-0 z-10 flex-1">
+            <h3 className="text-[1.05rem] leading-tight font-bold text-foreground/90 line-clamp-2" title={topRatedMentor?.name || "No rated mentor"}>
+              {topRatedMentor?.name || "None"}
             </h3>
-            <p className="mt-2 text-sm text-foreground/55">
+            <p className="text-[9px] text-foreground/55 line-clamp-1 mt-1">
               {getUniversityName(topRatedMentor?.institution)}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:min-w-[280px]">
-            <div className="rounded-2xl border border-cyan-500/20 bg-background/80 px-4 py-3 text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Average Rating</p>
-              <p className="mt-2 text-2xl font-semibold text-cyan-600">
-                {topRatedMentor?.averageRating?.toFixed?.(1) || topRatedMentor?.averageRating || "0.0"}
-              </p>
+          <div className="flex items-center justify-center gap-4 w-full mt-2 pt-2.5 border-t border-cyan-500/20 z-10 shrink-0">
+            <div className="flex-1 text-right">
+              <p className="text-[8px] font-black uppercase tracking-wider text-foreground/45 mb-1">Rating</p>
+              <div className="flex items-center justify-end gap-1">
+                <span className="text-[1.15rem] font-bold text-cyan-500 leading-none">
+                  {topRatedMentor?.averageRating?.toFixed?.(1) || topRatedMentor?.averageRating || "0.0"}
+                </span>
+                <Star size={9} className="fill-currentColor text-cyan-500" />
+              </div>
             </div>
-            <div className="rounded-2xl border border-cyan-500/20 bg-background/80 px-4 py-3 text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Total Ratings</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground/85">{topRatedMentor?.totalRatings || 0}</p>
+            <div className="w-px h-5 bg-border/60"></div>
+            <div className="flex-1 text-left">
+              <p className="text-[8px] font-black uppercase tracking-wider text-foreground/45 mb-1">Reviews</p>
+              <p className="text-[1.15rem] font-bold text-foreground/80 leading-none">
+                {topRatedMentor?.totalRatings || 0}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <div className="rounded-[1.6rem] border border-border/50 bg-card/70 p-4 shadow-sm backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Total Sessions</p>
-          <p className="mt-3 text-3xl font-semibold text-foreground/90">{sessionSummary.total || 0}</p>
-          <p className="mt-2 text-xs text-foreground/45">All tracked verified sessions</p>
-        </div>
-        <div className="rounded-[1.6rem] border border-violet-500/15 bg-violet-500/5 p-4 shadow-sm backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Upcoming</p>
-          <p className="mt-3 text-3xl font-semibold text-violet-600">{sessionSummary.upcoming || 0}</p>
-          <p className="mt-2 text-xs text-foreground/45">Accepted sessions not started yet</p>
-        </div>
-        <div className="rounded-[1.6rem] border border-cyan-500/15 bg-cyan-500/5 p-4 shadow-sm backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Ongoing</p>
-          <p className="mt-3 text-3xl font-semibold text-cyan-600">{sessionSummary.ongoing || 0}</p>
-          <p className="mt-2 text-xs text-foreground/45">Sessions currently live</p>
-        </div>
-        <div className="rounded-[1.6rem] border border-emerald-500/15 bg-emerald-500/5 p-4 shadow-sm backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Completed</p>
-          <p className="mt-3 text-3xl font-semibold text-emerald-600">{sessionSummary.completed || 0}</p>
-          <p className="mt-2 text-xs text-foreground/45">Successfully finished sessions</p>
-        </div>
-        <div className="rounded-[1.6rem] border border-rose-500/15 bg-rose-500/5 p-4 shadow-sm backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground/35">Expired</p>
-          <p className="mt-3 text-3xl font-semibold text-rose-600">{sessionSummary.expired || 0}</p>
-          <p className="mt-2 text-xs text-foreground/45">Sessions ended without completion</p>
-        </div>
-      </div>
-
       {/* 2. Refined Charts Area */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-2">
         
-        {/* Student Areas Distribution */}
-        <ChartBox title="Student Areas (Mentorship Demand)" icon={<TrendingUp size={14} className="text-cyan-500" />}>
-          <ResponsiveContainer width="100%" height={300}>
+        {/* Demand vs Supply Areas */}
+        <ChartBox title="Mentorship Areas (Demand vs Supply)" icon={<TrendingUp size={14} className="text-cyan-500" />}>
+          <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={studentAreas.length ? studentAreas : facultyData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
               <defs>
                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.1}/>
                   <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="areaGradientMentor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-[0.03]" vertical={false} />
@@ -309,11 +361,20 @@ export default function OverviewPage({ stats, analytics }) {
               <YAxis stroke="currentColor" className="opacity-20" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
               <Tooltip 
                 contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '11px' }}
-                itemStyle={{ color: '#06b6d4' }}
               />
               <Area 
                 type="monotone" 
-                dataKey="count" 
+                dataKey="mentors"
+                name="Mentor Supply" 
+                stroke="#8b5cf6" 
+                strokeWidth={2} 
+                fillOpacity={1} 
+                fill="url(#areaGradientMentor)"
+              />
+              <Area 
+                type="monotone" 
+                dataKey="students" 
+                name="Student Demand"
                 stroke="#06b6d4" 
                 strokeWidth={2} 
                 fillOpacity={1} 
@@ -325,7 +386,7 @@ export default function OverviewPage({ stats, analytics }) {
 
         {/* Partner Institutions */}
         <ChartBox title="Partner Institutions" icon={<BarChart3 size={14} className="text-purple-500" />}>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={uniData} margin={{ top: 10, right: 10, left: -25, bottom: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-[0.03]" vertical={false} />
               <XAxis
@@ -352,9 +413,9 @@ export default function OverviewPage({ stats, analytics }) {
       </div>
 
       {/* 3. Top Mentors Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartBox title="Top Mentors — Completed Sessions" icon={<TrendingUp size={14} className="text-amber-500" />}>
-          <div className="w-full overflow-auto">
+          <div className="w-full overflow-auto max-h-[180px]">
             <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="text-left text-xs text-foreground/50 uppercase tracking-widest">
@@ -384,7 +445,7 @@ export default function OverviewPage({ stats, analytics }) {
         </ChartBox>
 
         <ChartBox title="Top Mentors — Expired Sessions" icon={<TrendingUp size={14} className="text-rose-500" />}>
-          <div className="w-full overflow-auto">
+          <div className="w-full overflow-auto max-h-[180px]">
             <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="text-left text-xs text-foreground/50 uppercase tracking-widest">
