@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const fullNameRegex = /^[A-Za-z]+(?:[ '\-][A-Za-z]+)*$/;
 const urlPatterns = {
   linkedin: /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/,
   x: /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/,
@@ -53,6 +54,7 @@ export default function MentorRegister() {
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState("");
+  const [fullNameValidationError, setFullNameValidationError] = useState("");
   const [toast, setToast] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
@@ -81,22 +83,39 @@ export default function MentorRegister() {
   const [newSlot, setNewSlot] = useState({ day: DAYS[0].key, from: "09:00", to: "10:00" });
 
   const update = (e) => {
-    if (e.target.name === "email" && emailValidationError) {
+    const { name, value } = e.target;
+    if (name === "email" && emailValidationError) {
       setEmailValidationError("");
     }
-    setForm({ ...form, [e.target.name]: e.target.value });
+    if (name === "fullName") {
+      if (value.trim() === "") {
+        setFullNameValidationError("Full name is required.");
+      } else if (!fullNameRegex.test(value.trim())) {
+        setFullNameValidationError("Name may only contain letters, spaces, hyphens, and apostrophes.");
+      } else {
+        setFullNameValidationError("");
+      }
+    }
+    setForm({ ...form, [name]: value });
   };
 
   // Step 1 Validation & Email Check
   const isStep1Valid = useMemo(() => {
+    const isFullNameValid = fullNameRegex.test(form.fullName.trim());
     return (
-      form.fullName.trim().length > 2 &&
+      isFullNameValid &&
       /^\S+@\S+\.\S+$/.test(form.email) &&
       strongPasswordRegex.test(form.password)
     );
   }, [form]);
 
   const handleStep1Submit = async () => {
+    const isFullNameValid = fullNameRegex.test(form.fullName.trim());
+    if (!isFullNameValid) {
+      setFullNameValidationError("Name may only contain letters, spaces, hyphens, and apostrophes.");
+      setToast("Please fix your full name before continuing");
+      return;
+    }
     setEmailValidationError("");
     setCheckingEmail(true);
     try {
@@ -291,8 +310,11 @@ export default function MentorRegister() {
                 <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-4">
                   <div className="relative">
                     <User className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <input name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
+                    <input name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} className={`w-full bg-background/50 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${fullNameValidationError ? 'border-red-500' : 'border border-border'}`} />
                   </div>
+                  {fullNameValidationError && (
+                    <p className="-mt-2 text-[11px] font-medium text-red-500 px-1">{fullNameValidationError}</p>
+                  )}
                   <div className="relative">
                     <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
                     <input

@@ -28,6 +28,7 @@ export default function StudentRegister() {
   const [step, setStep] = useState(1);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState("");
+  const [fullNameValidationError, setFullNameValidationError] = useState("");
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -45,18 +46,30 @@ export default function StudentRegister() {
   const [selectedLearningGoal, setSelectedLearningGoal] = useState("");
 
   const strongRe = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}/;
+  const fullNameRegex = /^[A-Za-z]+(?:[ '\-][A-Za-z]+)*$/;
+  const isFullNameValid = fullNameRegex.test(form.fullName.trim());
+
   const isStep1Valid = useMemo(
     () =>
-      form.fullName.trim().length > 2 &&
+      isFullNameValid &&
       /^\S+@\S+\.\S+$/.test(form.email) &&
       strongRe.test(form.password),
-    [form.fullName, form.email, form.password]
+    [isFullNameValid, form.email, form.password]
   );
 
   const update = (e) => {
     const { name, value } = e.target;
     if (name === "email" && emailValidationError) {
       setEmailValidationError("");
+    }
+    if (name === "fullName") {
+      if (value.trim() === "") {
+        setFullNameValidationError("Full name is required.");
+      } else if (!fullNameRegex.test(value.trim())) {
+        setFullNameValidationError("Name may only contain letters, spaces, hyphens, and apostrophes.");
+      } else {
+        setFullNameValidationError("");
+      }
     }
     if (name === "semester") {
       // convert to number and clamp between 1 and 10
@@ -83,6 +96,11 @@ export default function StudentRegister() {
     e.preventDefault();
     if (!form.fullName || !form.email || !form.password) {
       setToast("Please fill in all fields to continue");
+      return;
+    }
+    if (!isFullNameValid) {
+      setFullNameValidationError("Name may only contain letters, spaces, hyphens, and apostrophes.");
+      setToast("Please fix your full name before continuing");
       return;
     }
     if (!strongRe.test(form.password)) return; // Logic handled by inline feedback
@@ -206,8 +224,11 @@ export default function StudentRegister() {
                   <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-5">
                     <div className="relative group">
                       <User className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
-                      <input type="text" name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} required className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all" />
+                      <input type="text" name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} required className={`w-full rounded-2xl border bg-background px-12 py-3 text-sm focus:ring-1 outline-none transition-all ${fullNameValidationError ? 'border-red-500 focus:ring-red-500/50' : 'border-border focus:ring-cyan-500/50'}`} />
                     </div>
+                    {fullNameValidationError && (
+                      <p className="-mt-3 text-[11px] font-medium text-red-500 px-1">{fullNameValidationError}</p>
+                    )}
 
                     <div className="relative group">
                       <Mail className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
