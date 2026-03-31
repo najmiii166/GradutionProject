@@ -110,6 +110,11 @@ export default function StudentRegister() {
       await api.post("/auth/check-email", { email: form.email, role: "student" });
       setStep(2);
     } catch (err) {
+      if (!err.response) {
+        setEmailValidationError("Unable to validate email. Please ensure your backend is running and CORS permits http://localhost:5174.");
+        setToast("Network or CORS error while validating email. Check server logs and origin settings.");
+        return;
+      }
       if (err.response?.data?.code === "EMAIL_NOT_EXIST") {
         setEmailValidationError("Email does not exist.");
         return;
@@ -118,7 +123,7 @@ export default function StudentRegister() {
         setEmailValidationError("Email already in use.");
         return;
       }
-      setToast(err.response?.data?.message || "Email is already in use");
+      setToast(err.response?.data?.message || "Email validation failed");
     } finally {
       setCheckingEmail(false);
     }
