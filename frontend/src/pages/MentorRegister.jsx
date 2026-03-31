@@ -55,6 +55,7 @@ export default function MentorRegister() {
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState("");
   const [fullNameValidationError, setFullNameValidationError] = useState("");
+  const [bioValidationError, setBioValidationError] = useState("");
   const [toast, setToast] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
@@ -96,6 +97,38 @@ export default function MentorRegister() {
         setFullNameValidationError("");
       }
     }
+    if (name === "yearsOfExperience") {
+      if (value.trim() === "") {
+        setForm({ ...form, [name]: "" });
+        return;
+      }
+
+      const num = Number(value);
+      if (Number.isNaN(num)) {
+        // ignore invalid numeric input, keep existing value
+        return;
+      }
+
+      if (num < 1) {
+        setForm({ ...form, [name]: "1" });
+        return;
+      }
+
+      setForm({ ...form, [name]: String(Math.floor(num)) });
+      return;
+    }
+
+    if (name === "bio") {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) {
+        setBioValidationError("Professional bio is required.");
+      } else if (trimmed.length < 15) {
+        setBioValidationError("Bio must be at least 15 characters.");
+      } else {
+        setBioValidationError("");
+      }
+    }
+
     setForm({ ...form, [name]: value });
   };
 
@@ -144,7 +177,9 @@ export default function MentorRegister() {
 
   // Step 2 Validation (All fields required)
   const isStep2Valid = useMemo(() => {
-    const hasBasics = selectedInstitutionKey && selectedFacultyKey && form.yearsOfExperience && form.bio.trim().length > 10;
+    const years = Number(form.yearsOfExperience || 0);
+    const bioTrimmed = form.bio.trim();
+    const hasBasics = selectedInstitutionKey && selectedFacultyKey && Number.isInteger(years) && years >= 1 && bioTrimmed.length >= 15;
     const hasSubAreas = selectedSubAreas.length > 0;
     const linkedinValid = urlPatterns.linkedin.test(socialLinks.linkedin);
     const xValid = urlPatterns.x.test(socialLinks.x);
@@ -394,10 +429,19 @@ export default function MentorRegister() {
                     <input type="number" name="yearsOfExperience" placeholder="Years of Experience *" value={form.yearsOfExperience} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none" />
                   </div>
 
-                  <div className="relative">
-                    <FileText className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <textarea name="bio" placeholder="Professional Bio (Minimum 10 chars) *" value={form.bio} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none min-h-[100px]" />
-                  </div>
+                                  <div className="relative">
+                      <FileText className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <textarea
+                        name="bio"
+                        placeholder="Professional Bio (Minimum 15 chars) *"
+                        value={form.bio}
+                        onChange={update}
+                        className={`w-full bg-background/50 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none min-h-[100px] ${bioValidationError ? 'border-red-500' : 'border border-border'}`}
+                      />
+                    </div>
+                    {bioValidationError && (
+                      <p className="-mt-2 text-[11px] font-medium text-red-500 px-1">{bioValidationError}</p>
+                    )}
 
                   <div className="space-y-3 pt-2">
                     <p className="text-xs font-medium text-muted-foreground px-1">Social Profiles (Only one required)</p>

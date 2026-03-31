@@ -379,9 +379,8 @@ export default function StudentRegister() {
               <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-8 h-8" /></div>
               <h2 className="text-2xl font-light italic font-serif mb-2">Registration Submitted</h2>
               <p className="text-foreground/60 text-sm mb-6">Your registration is received — an administrator will review your information and you will receive an email update.</p>
-              <div className="flex gap-3">
-                <button className="flex-1 rounded-xl px-4 py-2 border border-border" onClick={() => { setSuccessModal(false); }}>Stay</button>
-                <a href="/" className="flex-[2] rounded-xl px-4 py-2 bg-primary text-white">Go to Home</a>
+              <div className="flex justify-center">
+                <a href="/" className="w-full rounded-xl px-4 py-2 bg-primary text-white">Go to Home</a>
               </div>
             </motion.div>
           </div>
