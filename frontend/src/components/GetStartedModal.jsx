@@ -23,13 +23,13 @@ export default function GetStartedModal({ onClose }) {
         <div className="space-y-4">
           <button
             onClick={() => (window.location.href = "/register/student")}
-            className="w-full py-4 rounded-2xl bg-cyan-500 text-white font-bold hover:bg-cyan-600 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="w-full py-4 rounded-2xl bg-cyan-500 text-white font-bold hover:bg-cyan-600 dark:bg-cyan-500 dark:text-white dark:hover:bg-cyan-400 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Student Registration
           </button>
           <button
             onClick={() => (window.location.href = "/register/mentor")}
-            className="w-full py-4 rounded-2xl bg-white text-foreground font-bold border border-foreground hover:bg-foreground hover:text-white transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="w-full py-4 rounded-2xl bg-white text-foreground dark:bg-slate-700 dark:text-white font-bold border border-foreground dark:border-slate-500 hover:bg-foreground hover:text-white dark:hover:bg-slate-600 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Mentor Registration
           </button>

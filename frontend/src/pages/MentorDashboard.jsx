@@ -167,7 +167,7 @@ export default function MentorDashboard() {
             icon={Users}
             label="Pending Requests"
             value={requests.length}
-            hint="Students currently waiting for a response"
+            hint="Students waiting for a response"
             bg="bg-kpi-1"
             textColor="text-cyan-800 dark:text-cyan-400"
             glow="bg-cyan-500/20"
@@ -185,7 +185,7 @@ export default function MentorDashboard() {
             icon={Star}
             label="Avg Rating"
             value={stats?.averageRating ? Number(stats.averageRating).toFixed(1) : "0.0"}
-            hint={`${stats?.totalRatings || 0} student reviews received`}
+            hint={`${stats?.totalRatings || 0} reviews received`}
             bg="bg-kpi-3"
             textColor="text-amber-800 dark:text-amber-400"
             glow="bg-amber-500/20"
@@ -194,7 +194,7 @@ export default function MentorDashboard() {
             icon={Clock}
             label="Completed Sessions"
             value={stats?.credits || 0}
-            hint="Mentorship sessions successfully finished"
+            hint="sessions successfully finished"
             bg="bg-kpi-4"
             textColor="text-rose-800 dark:text-rose-400"
             glow="bg-rose-500/20"
