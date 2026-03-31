@@ -1,5 +1,6 @@
 import express from 'express';
 import Ticket from '../models/Ticket.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
@@ -52,11 +53,22 @@ router.post('/contact', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Validation failed', errors });
     }
 
+    // Ensure that only pending/unverified registered users may submit via public contact.
+    const user = await User.findOne({ email: em }).lean();
+    if (!user) {
+      return res.status(403).json({ success: false, message: 'Only registering users (pending/unverified) may contact admin through this form.' });
+    }
+
+    if (!['pending', 'unverified'].includes(user.status)) {
+      return res.status(403).json({ success: false, message: 'Only pending or unverified accounts can use this contact form. Please use in-app support channels for verified accounts.' });
+    }
+
     const ticket = new Ticket({
       source: 'public',
+      user: user._id,
       senderName: nm,
       senderEmail: em,
-      senderRole: 'public',
+      senderRole: user.role || 'student',
       subject: sj,
       message: ms,
       priority: pr,
