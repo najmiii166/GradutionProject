@@ -344,13 +344,13 @@ export default function MentorRegister() {
             <p className="text-sm text-muted-foreground mt-2">Step {step}: {step === 1 ? "Credentials" : step === 2 ? "Profile Details" : step === 3 ? "Working Hours" : "Profile Picture"}</p>
           </div>
 
-          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form autoComplete="off" className="space-y-5" onSubmit={(e) => e.preventDefault()}>
             <AnimatePresence mode="wait">
               {step === 1 && (
                 <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-4">
                   <div className="relative">
                     <User className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <input name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} className={`w-full bg-background/50 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${fullNameValidationError ? 'border-red-500' : 'border border-border'}`} />
+                    <input name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} autoComplete="name" className={`w-full bg-background/50 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${fullNameValidationError ? 'border-red-500' : 'border border-border'}`} />
                   </div>
                   {fullNameValidationError && (
                     <p className="-mt-2 text-[11px] font-medium text-red-500 px-1">{fullNameValidationError}</p>
@@ -363,6 +363,7 @@ export default function MentorRegister() {
                       placeholder="Email address"
                       value={form.email}
                       onChange={update}
+                      autoComplete="email"
                       className={`w-full bg-background/50 border rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none ${emailValidationError ? 'border-red-500' : 'border-border'}`}
                     />
                   </div>
@@ -371,7 +372,7 @@ export default function MentorRegister() {
                   )}
                   <div className="relative">
                     <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" value={form.password} onChange={update} className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-12 py-3.5 text-sm outline-none" />
+                    <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" value={form.password} onChange={update} autoComplete="new-password" className="w-full bg-background/50 border border-border rounded-2xl pl-11 pr-12 py-3.5 text-sm outline-none" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3.5 text-muted-foreground">
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>

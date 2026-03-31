@@ -223,13 +223,13 @@ export default function StudentRegister() {
               )}
             </div>
 
-            <form onSubmit={step === 1 ? nextStep : step === 2 ? completeAcademicsStep : submit} className="space-y-5">
+            <form autoComplete="off" onSubmit={step === 1 ? nextStep : step === 2 ? completeAcademicsStep : submit} className="space-y-5">
               <AnimatePresence mode="wait">
                 {step === 1 ? (
                   <motion.div key="s1" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-5">
                     <div className="relative group">
                       <User className="absolute left-4 top-3.5 h-4 w-4 text-foreground/20 group-focus-within:text-cyan-400 transition-colors" />
-                      <input type="text" name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} required className={`w-full rounded-2xl border bg-background px-12 py-3 text-sm focus:ring-1 outline-none transition-all ${fullNameValidationError ? 'border-red-500 focus:ring-red-500/50' : 'border-border focus:ring-cyan-500/50'}`} />
+                      <input type="text" name="fullName" placeholder="Full Name" value={form.fullName} onChange={update} required autoComplete="name" className={`w-full rounded-2xl border bg-background px-12 py-3 text-sm focus:ring-1 outline-none transition-all ${fullNameValidationError ? 'border-red-500 focus:ring-red-500/50' : 'border-border focus:ring-cyan-500/50'}`} />
                     </div>
                     {fullNameValidationError && (
                       <p className="-mt-3 text-[11px] font-medium text-red-500 px-1">{fullNameValidationError}</p>
@@ -240,10 +240,12 @@ export default function StudentRegister() {
                       <input
                         type="email"
                         name="email"
+                        inputMode="email"
                         placeholder="Email Address"
                         value={form.email}
                         onChange={update}
                         required
+                        autoComplete="email"
                         className={`w-full rounded-2xl border bg-background px-12 py-3 text-sm outline-none transition-all ${emailValidationError ? 'border-red-500 focus:ring-1 focus:ring-red-500/40' : 'border-border focus:ring-1 focus:ring-cyan-500/50'}`}
                       />
                     </div>
@@ -261,6 +263,7 @@ export default function StudentRegister() {
                           value={form.password}
                           onChange={update}
                           required
+                          autoComplete="new-password"
                           className="w-full rounded-2xl border border-border bg-background px-12 py-3 text-sm focus:ring-1 focus:ring-cyan-500/50 outline-none transition-all"
                         />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3 text-foreground/20 hover:text-foreground">
