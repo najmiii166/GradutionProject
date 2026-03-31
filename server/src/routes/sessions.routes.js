@@ -169,7 +169,7 @@ router.get("/history/student", auth, async (req, res) => {
         populate: {
           path: "user",
           model: "User",
-          select: "fullName profileImageUrl",
+          select: "fullName profileImageUrl status",
         },
       })
       .sort({ startTime: -1 })
@@ -186,8 +186,10 @@ router.get("/history/student", auth, async (req, res) => {
         s.status = newStatus;
       }
 
-      // ✅ now safely filter
-      if (s.status === "completed" || s.status === "expired") {
+      // ✅ include only finalized sessions with verified mentors
+      const mentorStatus = s.mentorId?.user?.status;
+      const hasVerifiedMentor = mentorStatus === "verified";
+      if ((s.status === "completed" || s.status === "expired") && hasVerifiedMentor) {
         finalized.push(s);
       }
     }
